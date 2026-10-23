@@ -1,0 +1,9 @@
+{
+  "name": "gentle-giant-council",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Asks Claude what the villagers of Gentle Giant plan to do each night.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}
