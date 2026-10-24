@@ -17,6 +17,7 @@ Walk the valley as Oru or Vela, decode the villagers' glyph language and secret 
 | Variable | What it does | Default |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | Your Claude API key. Set it in Render, never in the code. | none |
+| `ANTHROPIC_WORKSPACE_ID` | Only if your key isn't tied to one workspace: the workspace ID (starts with `wrkspc_`). | none |
 | `DAILY_CAP_USD` | Stop calling Claude after this much spend in a UTC day. | `1` |
 | `MODEL` | Which Claude model plans the council. | `claude-haiku-5-5` |
 | `ALLOWED_ORIGINS` | Sites allowed to call the server. | `https://ostromaj.github.io` |

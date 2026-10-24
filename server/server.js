@@ -4,7 +4,8 @@
 const http = require('http');
 
 const PORT = Number(process.env.PORT || 10000);
-const KEY = process.env.ANTHROPIC_API_KEY || '';
+const KEY = (process.env.ANTHROPIC_API_KEY || '').trim();
+const WORKSPACE = (process.env.ANTHROPIC_WORKSPACE_ID || '').trim();   // only needed for keys not tied to one workspace
 const MODEL = process.env.MODEL || 'claude-haiku-5-5';
 const DAILY_CAP_USD = Number(process.env.DAILY_CAP_USD || 1);
 // Claude Haiku 5.5 list prices per million tokens (prompts under 100K tokens)
@@ -19,7 +20,7 @@ const PLAN_TYPES = ['festival', 'gift', 'petition', 'ambush', 'lure', 'exodus', 
 const PLACES = ['river', 'fields', 'homes'];
 const REQUESTS = ['water', 'rebuild', 'food', 'not_step'];
 
-let spendDay = utcDay(), spent = 0, calls = 0;
+let spendDay = utcDay(), spent = 0, calls = 0, lastError = null;
 const hits = new Map();   // key -> [timestamps]
 
 function utcDay() { return new Date().toISOString().slice(0, 10); }
@@ -108,12 +109,17 @@ async function council(body) {
   if (!d.villagers.length) return [400, { error: 'no villagers' }];
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    headers: Object.assign({ authorization: 'Bearer ' + KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, WORKSPACE ? { 'anthropic-workspace-id': WORKSPACE } : {}),
     body: JSON.stringify({ model: MODEL, max_tokens: MAX_OUTPUT_TOKENS, messages: [{ role: 'user', content: buildPrompt(d) }] }),
   });
   const j = await r.json().catch(() => ({}));
   if (j.usage) { spent += (j.usage.input_tokens || 0) / 1e6 * PRICE_IN + (j.usage.output_tokens || 0) / 1e6 * PRICE_OUT; calls++; }
-  if (!r.ok) { console.error('claude error', r.status, JSON.stringify(j).slice(0, 300)); return [502, { error: 'Claude could not answer right now' }]; }
+  if (!r.ok) {
+    console.error('claude error', r.status, JSON.stringify(j).slice(0, 300));
+    lastError = { at: new Date().toISOString(), status: r.status, type: (j.error && j.error.type) || '', message: String((j.error && j.error.message) || '').slice(0, 200) };
+    return [502, { error: 'Claude could not answer right now' }];
+  }
+  lastError = null;
   const text = (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
   const parsed = parseJSON(text);
   if (!parsed) return [502, { error: 'Claude replied without usable plans' }];
@@ -136,7 +142,7 @@ http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/health')) {
     rollDay();
-    return send(res, origin, 200, { ok: true, model: MODEL, hasKey: !!KEY, spentTodayUSD: Number(spent.toFixed(4)), capUSD: DAILY_CAP_USD, callsToday: calls });
+    return send(res, origin, 200, { ok: true, model: MODEL, hasKey: !!KEY, keyLooksRight: KEY ? KEY.startsWith('sk-ant-') : null, workspaceSet: !!WORKSPACE, spentTodayUSD: Number(spent.toFixed(4)), capUSD: DAILY_CAP_USD, callsToday: calls, lastError });
   }
   if (req.method === 'POST' && url.pathname === '/council') {
     if (origin && !ORIGINS.includes(origin)) return send(res, origin, 403, { error: 'origin not allowed' });
