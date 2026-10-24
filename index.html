@@ -39,8 +39,8 @@ button:focus-visible, select:focus-visible { outline: 3px solid var(--wheat); ou
 /* ---------- HUD ---------- */
 .hud { position: fixed; z-index: 5; pointer-events: none; }
 .hud > * { pointer-events: auto; }
-#hud-tl { top: calc(16px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); display: flex; gap: 10px; align-items: center; }
-#hud-tr { top: calc(16px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; }
+#hud-tl { top: calc(16px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: calc(48% - 16px); }
+#hud-tr { top: calc(16px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; max-width: calc(52% - 16px); }
 .chip { background: var(--dusk); backdrop-filter: blur(6px); border-radius: 999px; padding: 8px 14px; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; }
 .chip .dial { width: 18px; height: 18px; border-radius: 50%; background: conic-gradient(var(--wheat) var(--p, 0%), rgba(241,234,217,.18) 0); }
 .hud-btn { background: var(--dusk); color: var(--bone); border: 0; border-radius: 999px; padding: 8px 14px; font-weight: 700; font-size: 14px; display: inline-flex; gap: 8px; align-items: center; backdrop-filter: blur(6px); }
@@ -198,6 +198,7 @@ kbd { font-family: var(--font-body); font-size: 11px; font-weight: 800; border: 
 .rev-choice b { font-family: var(--font-display); font-weight: 400; font-size: 24px; }
 .rev-choice span { font-size: 14px; opacity: .85; line-height: 1.4; }
 @media (max-width: 560px) {
+  #hud-tl, #hud-tr { max-width: calc(100% - 32px); }
   #hud-tr { top: calc(62px + env(safe-area-inset-top, 0px)); }
   #listen { top: calc(108px + env(safe-area-inset-top, 0px)); }
   body.touch #act { bottom: calc(300px + env(safe-area-inset-bottom, 0px)); }
@@ -229,7 +230,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 <div class="hud chip" id="act" hidden></div>
 <div class="hud" id="hud-help" hidden>
   <b>Walk</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp; <b>Look</b> drag the mouse<br>
-  <b>Tread lightly</b> hold <kbd>Shift</kbd> &nbsp; <b>Kneel</b> <kbd>E</kbd><br>
+  <b>Tread lightly</b> hold <kbd>Shift</kbd> to step over huts &nbsp; <b>Kneel</b> <kbd>E</kbd><br>
   <b>Scoop water, pick fruit, pour, drop</b> <kbd>F</kbd><br>
   <b>Speak</b> <kbd>T</kbd> &nbsp; <b>Smite</b> <kbd>Q</kbd> at the ringed villager<br>
   <b>Change Aspect</b> <kbd>R</kbd> once you have one<br>
@@ -256,7 +257,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 
 <section id="start" aria-labelledby="title">
   <div class="start-inner">
-    <div class="build">Playable build 0.8</div>
+    <div class="build">Playable build 0.9</div>
     <h1 id="title">Gentle Giant</h1>
     <p class="tag">They sing for you every night. Learn what they're singing.</p>
     <button class="continue" type="button" id="continue" hidden><b>Continue</b><span id="continue-sub"></span></button>
@@ -1646,6 +1647,8 @@ let sealedSeen = false;
 const lockedCount = () => ROOT_IDS.filter(id => words[id].locked).length;
 const scriptW = {};
 for (const id of ROOT_IDS) scriptW[id] = { seen: 0, guess: '', confirms: 0, locked: false, misfit: null };
+// the last word of the plea takes longer to be sure of on the first day
+const needFits = (id, script) => script ? 3 : (id === 'go' && dayNum < 2 ? 4 : 2);
 const scriptCount = () => ROOT_IDS.filter(id => scriptW[id].locked).length;
 let scriptActive = false, nameUnsealed = false;
 const NAME_PARTS = ['big', 'step', 'afraid'];
@@ -1942,7 +1945,7 @@ function say(v, line, whisper, forceScript) {
     w.seen++; if (!script) w.lines.add(line.id);
     const target = ROOTS[id].en;
     if (!w.locked && w.guess) {
-      if (w.guess === target) { w.confirms++; w.misfit = null; if (w.confirms >= 2) (script ? lockScript : lockWord)(id); }
+      if (w.guess === target) { w.confirms++; w.misfit = null; if (w.confirms >= needFits(id, script)) (script ? lockScript : lockWord)(id); }
       else {
         w.confirms = 0; misfits.add(id);
         const pl = placeName(v); w.misfit = `Didn't fit when ${ROLE_TITLE[v.role].toLowerCase()} ${v.name} said it ${pl.startsWith('at ') ? '' : 'at '}${pl}.`;
@@ -2201,10 +2204,10 @@ function updateVillager(v, dt) {
   // emotions
   let decay = 1.1;
   if (d > 90) decay += 1.6;
-  if (stilled() && d < 80) { decay += 2.6; v.trust = Math.min(100, v.trust + 0.9 * dt); }
+  if (stilled() && d < 80) { decay += 2.6; const scar = Math.max(10, 70 - homesLost * 6 - smiteCount * 12); if (!v.grudge && v.trust < scar) v.trust = Math.min(scar, v.trust + 0.3 * dt); }
   if (v.role === 'child') decay += 1.5;
   v.fear = clamp(v.fear - decay * dt, 0, 100);
-  v.anger = clamp((v.anger || 0) - (stilled() && d < 80 ? 0.5 : 0.18) * dt, 0, 100);
+  v.anger = clamp((v.anger || 0) - (stilled() && d < 80 ? 0.2 : 0.07) * dt, 0, 100);
   if (v.hidden) return;
   if (v.sleeping) { v.mesh.g.position.set(v.x, height(v.x, v.z) + 0.45, v.z); v.mesh.g.rotation.set(-Math.PI / 2, v.yaw, 0, 'YXZ'); return; }
   if (v.riding) {
@@ -2292,6 +2295,7 @@ function updateVillager(v, dt) {
 function houseEvent(h, kind) {
   if (kind === 'crush') {
     h.crushed = true; h.rebuild = 0; h.burning = 0; homesLost++;
+    if (typeof pimBond !== 'undefined' && !loading) pimBond -= h === PIM.homeHouse ? 25 : 6;
     h.walls.scale.y = 0.28; h.walls.position.y = 0.5 * h.s;
     h.roof.position.y = 1.4 * h.s; h.roof.rotation.z = 0.55; h.roof.rotation.x = 0.25;
     h.roofMat.color.setHex(0x8f7a45); h.baseWall.multiplyScalar(0.7); h.wallsMat.color.copy(h.baseWall);
@@ -2425,7 +2429,8 @@ function footstep(fx, fz) {
   for (const h of houses) {
     if (h.crushed) continue;
     const d = hyp(fx - h.x, fz - h.z);
-    if (d < h.r + 2.4) { if (gameTime < promiseT) brokePromise(); houseEvent(h, 'crush'); }
+    if (d < h.r + 2.4 && !light) { if (gameTime < promiseT) brokePromise(); houseEvent(h, 'crush'); }
+    else if (d < h.r + 2.4) { h.wobble = 1; think('stepover', 'I stepped over their roof, slow and careful. Not a tile broke.'); for (const o of h.occupants) o.fear = Math.min(100, o.fear + 30); }
     else if (d < 18) { h.wobble = 1; think('careful', 'Careful. Their homes are so small.'); for (const o of h.occupants) o.fear = Math.min(100, o.fear + 18); }
   }
   for (const v of villagers) {
@@ -2445,7 +2450,7 @@ function footstep(fx, fz) {
   if (hyp(PIM.x - fx, PIM.z - fz) < 30) PIM.nearStepT = gameTime;
   trampleWheat(fx, fz, light ? 3.2 : 4.6);
   aspectStep(fx, fz);
-  if (hyp(PIM.x - fx, PIM.z - fz) < 8 && !PIM.riding) pimBond -= 10;
+  if (hyp(PIM.x - fx, PIM.z - fz) < 4.5 && !PIM.riding && gameTime - (PIM.nearMissT || -99) > 12) { PIM.nearMissT = gameTime; pimBond -= 8; }
   stompStakes(fx, fz);
   if (giant.roped > 0 && giant.roped < 5.5) { cutRopes(true); think('snap', 'The ropes snapped. They scattered like leaves.'); }
   if (ending && ending.kind === 'leave') leaveStep(fx, fz);
@@ -2932,13 +2937,13 @@ function readTablet() {
   think('tablet', 'Their name for me, and three marks that explain it. I must learn those marks.');
 }
 function checkStory() {
-  if (!scriptActive && lockedCount() >= 7) {
+  if (!scriptActive && lockedCount() >= 9 && dayNum >= 2) {
     scriptActive = true;
     toast('<span>They noticed you understand them. Their whispers now use a secret script.</span>');
     think('scriptOn', 'They have stopped using the old marks when they whisper. They know I can read them.');
     const e = villagers.find(v => v.role === 'elder'); if (e) e.memory.push({ type: 'script', t: gameTime });
   }
-  if (scriptActive && !tablet && scriptCount() >= 4) {
+  if (scriptActive && !tablet && scriptCount() >= 9 && dayNum >= 4 && NAME_PARTS.every(id => words[id].locked)) {
     tablet = makeTablet();
     toast('<span>The Elder climbed the shrine hill and carved something there.</span>');
     think('tabletOn', 'The old one went up the shrine hill tonight. She carved something into the stone.');
@@ -4010,8 +4015,9 @@ function updateCouncil(dt) {
     for (const p of m.plans) { villageLog(`the council chose: ${p.type}${p.type === 'petition' ? ' for ' + REQUESTS[p.request] : ''}${p.place && ['ambush', 'lure'].includes(p.type) ? ' at ' + PLACES[p.place].label : ''}, led by ${p.leader}`); for (const n of p.members) journal(byName(n), `I agreed to the ${p.type} plan`); }
   }
 }
+const placeLabel = p => (PLACES[p.place] || PLACES.homes).label;
 function overheardToast(p) {
-  const what = { festival: 'They plan a festival for you tomorrow.', gift: 'They plan to bring you gifts.', petition: `They will come to ask you for ${REQUESTS[p.request]}.`, ambush: `An ambush. Tomorrow, at ${PLACES[p.place].label}.`, lure: `A trap: food left out with stakes hidden around it, near ${PLACES[p.place].label}.`, exodus: 'Some of them mean to leave over the pass tonight.', watch: 'They are posting lookouts to watch for you at night.', hide_children: 'They will hide the children from you tomorrow.' }[p.type];
+  const what = { festival: 'They plan a festival for you tomorrow.', gift: 'They plan to bring you gifts.', petition: `They will come to ask you for ${REQUESTS[p.request]}.`, ambush: `An ambush. Tomorrow, at ${placeLabel(p)}.`, lure: `A trap: food left out with stakes hidden around it, near ${placeLabel(p)}.`, exodus: 'Some of them mean to leave over the pass tonight.', watch: 'They are posting lookouts to watch for you at night.', hide_children: 'They will hide the children from you tomorrow.' }[p.type];
   toast(`<span>You overheard their plan. ${what}</span>`);
   think('plan-' + p.id, p.type === 'ambush' || p.type === 'lure' ? 'They mean to hurt me. I know where, and I know when.' : p.type === 'exodus' ? 'They would rather walk into the mountains than live beside me.' : 'They are planning something for me.');
 }
@@ -4033,6 +4039,7 @@ function startPlan(p) {
   p.state = 'active'; p.t = 0;
   const members = p.members.map(byName).filter(v => v && !v.dead && !v.gone);
   for (const v of members) { v.planId = p.id; if (v.hidden && p.type !== 'hide_children') unhide(v); v.thinkT = 0; }
+  if ((p.type === 'ambush' || p.type === 'lure') && !PLACES[p.place]) p.place = favouritePlace();
   if (p.type === 'ambush' || p.type === 'lure') p.spot = PLACES[p.place].at();
   if (p.type === 'lure') {
     const meshes = [], y = height(p.spot.x, p.spot.z);
@@ -4165,7 +4172,7 @@ function swarmBrain(v) {
     case 'petition': if (!p.asked) { const f = giantForward(); v.state = 'petition'; v.target = { x: giant.x + f.x * 18 + i * 3, z: giant.z + f.z * 18 }; v.activity = 'coming to ask you something'; return true; } return false;
     case 'ambush': {
       if (p.sprung) { const k = 28 / Math.max(hyp(v.x - giant.x, v.z - giant.z), 1); v.state = 'attack'; v.target = { x: giant.x + (v.x - giant.x) * k, z: giant.z + (v.z - giant.z) * k }; v.activity = 'springing an ambush'; return true; }
-      v.state = 'lurk'; v.target = { x: p.spot.x + Math.cos(a) * 6, z: p.spot.z + Math.sin(a) * 6 }; v.activity = `hiding in the grass by ${PLACES[p.place].label}`; return true;
+      v.state = 'lurk'; v.target = { x: p.spot.x + Math.cos(a) * 6, z: p.spot.z + Math.sin(a) * 6 }; v.activity = `hiding in the grass by ${placeLabel(p)}`; return true;
     }
     case 'lure': v.state = 'lurk'; v.target = { x: p.spot.x + Math.cos(a) * 26, z: p.spot.z + Math.sin(a) * 26 }; v.activity = 'watching the bait from hiding'; return true;
     case 'exodus': if (v.spotted) { v.state = 'home'; v.target = homeOf(v).door; v.activity = 'running home, caught'; return true; } v.state = 'exodus'; v.target = { x: PASS.x + i * 2, z: PASS.z }; v.activity = 'sneaking toward the pass'; return true;
@@ -4309,7 +4316,7 @@ function renderNotebook() {
       const w = words[id];
       if (w.locked) return `<div class="word locked"><img src="${GLYPH[id]}" alt=""><span class="en">${ROOTS[id].en}</span><span class="st">Understood · heard ${w.seen}×</span></div>`;
       const opts = ['<option value="">guess…</option>'].concat(MEANINGS.map(m => `<option${w.guess === m ? ' selected' : ''}>${m}</option>`)).join('');
-      const st = w.misfit ? w.misfit : w.guess ? (w.confirms ? 'Fit once. One more and it locks.' : 'Testing. Waiting to hear it again.') : `Heard ${w.seen}× in ${w.lines.size} different line${w.lines.size === 1 ? '' : 's'}.`;
+      const st = w.misfit ? w.misfit : w.guess ? (w.confirms ? (needFits(id, false) - w.confirms === 1 ? `Fit ${w.confirms === 1 ? 'once' : w.confirms + ' times'}. One more and it locks.` : `Fit ${w.confirms} of ${needFits(id, false)} times. You want to be sure of this one.`) : 'Testing. Waiting to hear it again.') : `Heard ${w.seen}× in ${w.lines.size} different line${w.lines.size === 1 ? '' : 's'}.`;
       return `<label class="word${w.misfit ? ' misfit' : ''}"><img src="${GLYPH[id]}" alt=""><select id="guess-${id}" data-id="${id}" aria-label="Guess for this glyph">${opts}</select><span class="st">${st}</span></label>`;
     }).join('') + (sealedSeen ? (nameUnsealed ? `<div class="word locked"><img src="${GLYPH.name}" alt=""><span class="en">the big step we fear</span><span class="st">Their name for you.</span></div>` : `<div class="word sealed"><img src="${GLYPH.name}" alt=""><span class="en">Sealed</span><span class="st">${tablet ? 'Carved at the shrine, with three script marks that explain it.' : 'It\'s what they call you. You can\'t read it yet.'}</span></div>`) : '');
     wEl.querySelectorAll('select').forEach(s => s.addEventListener('change', () => {
@@ -4326,7 +4333,7 @@ function renderNotebook() {
         const w = scriptW[id];
         if (w.locked) return `<div class="word locked"><img src="${SCRIPT_GLYPH[id]}" alt=""><span class="en">${ROOTS[id].en}</span><span class="st">Cracked · seen ${w.seen}×</span></div>`;
         const opts = ['<option value="">guess…</option>'].concat(known.map(m => `<option${w.guess === m ? ' selected' : ''}>${m}</option>`)).join('');
-        const st = w.misfit || (w.guess ? (w.confirms ? 'Fit once. One more and it locks.' : 'Testing. Waiting to see it again.') : `Seen ${w.seen}×.` + (NAME_PARTS.includes(id) && tablet ? ' Carved on the shrine.' : ''));
+        const st = w.misfit || (w.guess ? (w.confirms ? `Fit ${w.confirms} of 3 times.` : 'Testing. Waiting to see it again.') : `Seen ${w.seen}×.` + (NAME_PARTS.includes(id) && tablet ? ' Carved on the shrine.' : ''));
         return `<label class="word${w.misfit ? ' misfit' : ''}"><img src="${SCRIPT_GLYPH[id]}" alt=""><select data-sid="${id}" aria-label="Guess for this mark">${opts}</select><span class="st">${st}</span></label>`;
       }).join('')}</div>` : '<p class="empty">No marks seen yet. Listen for whispers.</p>');
     sEl.querySelectorAll('select').forEach(sl => sl.addEventListener('change', () => { const w = scriptW[sl.dataset.sid]; w.guess = sl.value; w.confirms = 0; w.misfit = null; renderNotebook(); refreshBubbles(); }));
@@ -4526,7 +4533,7 @@ function updateWorld(dt) {
     if (ph === 'dusk') { if (funeral) think('funeral-' + funeral.name, `They are not singing for me tonight. They are burying ${funeral.name}.`, true); else think('dusk', 'They are gathering in the plaza. They sing for me every night.'); }
     if (ph === 'night') { think('night', 'They all go inside at night. I wish they would not hide from me.'); if (hyp(giant.x - VC.x, giant.z - VC.z) < 150) nightsNear++; if (funeral) funeral = null; for (const v of villagers) v.mournAt = null; }
     if (ph === 'dawn') { pimDawn(); for (const gr of graves) if (gr.flowers < 3 && villagers.some(v => kinOf({ name: gr.name, homeHouse: null }).has(v.name) || v.grudgeFor === gr.name)) { gr.flowers++; const f = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 0), mat(pick([0xf1b7c8, 0xf4e3a0, 0xf6f0e6]))); f.position.set(gr.x + rand(-1.2, 1.2), height(gr.x, gr.z) + 0.4, gr.z + 1.5 + rand(-0.6, 0.6)); scene.add(f); } }
-    if (ph === 'day' && prevPhaseKey === 'dawn' && dayNum > 1) think('day' + dayNum, `Day ${dayNum}. The bread is still there at the stone.`);
+    if (ph === 'day' && prevPhaseKey === 'dawn' && dayNum > 1 && basket.visible) think('day' + dayNum, `Day ${dayNum}. The bread is still there at the stone.`);
     if (ph === 'dusk' && basket.visible) basket.visible = false;
     prevPhaseKey = ph;
   }
