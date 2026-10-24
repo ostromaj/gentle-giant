@@ -164,6 +164,8 @@ kbd { font-family: var(--font-body); font-size: 11px; font-weight: 800; border: 
 #reticle.cool { border-color: rgba(241,234,217,.3); }
 #reticle.cool::after { content: "…"; }
 .bubble.giant-b { background: var(--paper); border: 2px solid var(--wheat); }
+.bubble .dots { font: 800 18px var(--font-body); letter-spacing: .1em; color: var(--graphite); animation: dotpulse 1s infinite; }
+@keyframes dotpulse { 50% { opacity: .35; } }
 .bubble.giant-b::after { border-top-color: var(--wheat); }
 .cart { font: 800 10px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--paper); background: #4a3f55; border-radius: 999px; padding: 2px 8px; margin-top: 2px; }
 .bubble.bad { box-shadow: 0 0 0 2px #c9493c, 0 6px 18px rgba(20,16,30,.28); }
@@ -257,7 +259,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 
 <section id="start" aria-labelledby="title">
   <div class="start-inner">
-    <div class="build">Playable build 0.9</div>
+    <div class="build">Playable build 0.10</div>
     <h1 id="title">Gentle Giant</h1>
     <p class="tag">They sing for you every night. Learn what they're singing.</p>
     <button class="continue" type="button" id="continue" hidden><b>Continue</b><span id="continue-sub"></span></button>
@@ -2136,6 +2138,7 @@ function brain(v) {
   }
   if (weather.kind === 'rain' && weather.amt > 0.6 && ph === 'day' && v.i % 3 !== 0 && v.state !== 'attack' && !v.planId && !v.betray) { v.state = 'home'; v.target = homeOf(v).door; v.activity = 'running in from the rain'; return; }
   if (v.sentHome > gameTime) { v.state = 'home'; v.target = homeOf(v).door; v.activity = 'going home because you told them to'; return; }
+  if (v.comeT > gameTime && !v.riding) { const d = hyp(v.x - giant.x, v.z - giant.z), k = 14 / Math.max(d, 1); v.state = 'watch'; v.target = { x: giant.x + (v.x - giant.x) * k, z: giant.z + (v.z - giant.z) * k }; v.activity = 'coming closer to talk to you'; return; }
   if (v.singT > gameTime) { v.state = 'gather'; v.target = v.gather || (v.gather = gatherSlot(v)); v.activity = 'singing because you asked'; return; }
   if (v.fear > 62 && d < 90) { v.state = 'flee'; v.target = homeOf(v).door; v.activity = 'running from you'; return; }
   if (v.fear > 38 && d < 46 && !(v.planId && village.plans.some(p => p.id === v.planId && p.sprung))) { v.state = 'cower'; v.target = null; v.activity = 'cowering'; return; }
@@ -2761,6 +2764,7 @@ function openSpeak(mode = 'talk') {
   speakMode = mode; sentence = [];
   $('#speak-title').textContent = mode === 'final' ? 'Speak one true sentence' : 'Speak to them';
   $('#speak-hint').textContent = mode === 'final' ? 'This is the last thing you will say to them. Make it true, and make it something they need to hear.' : 'Pick up to four words you understand. Your voice is huge, so kneel first if you don’t want to frighten them.';
+  if (mode !== 'final' && talkOnline()) $('#speak-hint').textContent += ' They’ll answer in their own words, so listen to what comes back.';
   $('#speak-cancel').hidden = mode === 'final';
   $('#speak-words').innerHTML = kw.map(id => `<button type="button" data-id="${id}"><img src="${GLYPH[id]}" alt="">${id === 'name' ? 'their name' : ROOTS[id].en}</button>`).join('');
   $('#speak-words').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { if (sentence.length < 4) { sentence.push(b.dataset.id); renderSentence(); } }));
@@ -2794,7 +2798,7 @@ function reply(v, id, delay) { replies.push({ v, line: LINES[id], t: gameTime + 
 function processReplies() {
   for (let i = replies.length - 1; i >= 0; i--) {
     const r = replies[i];
-    if (gameTime >= r.t) { replies.splice(i, 1); if (!r.v.dead && !r.v.hidden && !r.v.sleeping) say(r.v, r.line, false, false); }
+    if (gameTime >= r.t) { replies.splice(i, 1); if (!r.v.dead && !r.v.sleeping && (!r.v.hidden || r.whisper)) say(r.v, r.line, !!r.whisper, r.whisper ? undefined : false); }
   }
 }
 function interpret(r) {
@@ -2802,49 +2806,130 @@ function interpret(r) {
   const near = villagers.filter(v => hyp(v.x - giant.x, v.z - giant.z) < 110).sort((a, b) => hyp(a.x - giant.x, a.z - giant.z) - hyp(b.x - giant.x, b.z - giant.z));
   for (const v of near) { const d = hyp(v.x - giant.x, v.z - giant.z); v.fear = Math.min(100, v.fear + (soft ? 3 : 12) * (1 - d / 110)); }
   const responders = near.filter(v => !v.hidden && !v.sleeping).slice(0, 3);
-  const answer = ids => responders.forEach((v, i) => reply(v, v.role === 'child' && ids.includes('S1') ? 'C5' : pick(ids), 1.4 + i * 1.4));
+  let canned = ['P7'], effect = '';
+  const answer = (ids, what) => { canned = ids; effect = what || ''; };
   let understood = true;
   if (has('not') && has('afraid')) {
     for (const v of near) { v.fear = Math.max(0, v.fear - (soft ? 30 : 14)); v.trust = Math.min(100, v.trust + 6); addAnger(v, -6); }
     pimBond += 3; kindness += 0.5;
-    answer(['S1', 'S2']); think('say-calm', 'Do not be afraid. I have wanted to tell them that for so long.');
+    answer(['S1', 'S2'], 'they feel calmer; fewer of them are afraid'); think('say-calm', 'Do not be afraid. I have wanted to tell them that for so long.');
   } else if (has('not') && has('step')) {
     promiseT = gameTime + 240;
     for (const v of near) { v.trust = Math.min(100, v.trust + 10); addAnger(v, -8); }
-    answer(['S3', 'S1']); think('say-promise', 'I promised not to step on them. I had better keep it.');
+    answer(['S3', 'S1'], 'they take it as a promise not to step on them'); think('say-promise', 'I promised not to step on them. I had better keep it.');
   } else if (has('not') && has('go')) {
     giantAsksPeace('go');
     for (const v of near) { v.trust = Math.min(100, v.trust + 4); v.fear = Math.max(0, v.fear - 6); }
-    answer(['S2', 'S1']); think('say-stay', 'Do not go. I said it in their own words.');
+    answer(['S2', 'S1'], 'the giant told them not to go away; some are relieved, some feel trapped'); think('say-stay', 'Do not go. I said it in their own words.');
   } else if (has('not') && has('fight')) {
     giantAsksPeace('fight');
     for (const v of near) { addAnger(v, v.trust > 15 ? -22 : -6); v.fear = Math.max(0, v.fear - 8); }
-    answer(['R9', 'S1']); think('say-peace', 'No fighting. Please. I never wanted any of this.');
+    answer(['R9', 'S1'], 'the giant asked for no fighting; the angry ones cool a little'); think('say-peace', 'No fighting. Please. I never wanted any of this.');
   } else if (has('fight')) {
     for (const v of near) { addAnger(v, 22); v.fear = Math.max(0, v.fear - 10); }
-    answer(['R2', 'R3', 'R11']); think('say-taunt', 'Let them come, then.');
+    answer(['R2', 'R3', 'R11'], 'the giant dared them to fight; it made them angry and bold'); think('say-taunt', 'Let them come, then.');
   } else if (has('home') && (has('go') || has('hide'))) {
     for (const v of near) { v.sentHome = gameTime + 40; v.thinkT = 0; }
-    answer(['P9', 'Q3']);
+    answer(['P9', 'Q3'], 'the giant sent them home; they are going indoors');
   } else if (has('sing')) {
     for (const v of near) { v.singT = gameTime + 35; v.thinkT = 0; }
-    answer(['P2', 'P4']);
+    answer(['P2', 'P4'], 'the giant asked them to sing; they will gather and sing for it');
   } else if (has('food') && (has('please') || has('name') || (has('big') && !has('not')))) {
     const v = near.find(o => isAdult(o) && !o.hidden && o.fear < 95);
     if (v) { v.bring = 'tribute'; v.thinkT = 0; }
     for (const o of near) addAnger(o, 5);
-    answer(['P3', 'P7']); think('say-tribute', 'I asked for food, and they are hurrying to bring it.');
+    answer(['P3', 'P7'], 'the giant demanded food; someone is hurrying to bring it, and they resent it a little'); think('say-tribute', 'I asked for food, and they are hurrying to bring it.');
   } else if (has('food') && (has('child') || has('good'))) {
     for (const v of near) v.trust = Math.min(100, v.trust + 3);
-    answer(['Q13', 'C4']);
+    answer(['Q13', 'C4'], 'the giant talked about food and children; it seemed kind');
   } else if (has('name')) {
     for (const v of near) v.fear = Math.min(100, v.fear + 20);
-    answer(['R9', 'P7']); think('say-name', 'I said their name for me out loud. Now they know that I know.');
+    answer(['R9', 'P7'], 'the giant said their secret name for it out loud; they are frightened that it knows'); think('say-name', 'I said their name for me out loud. Now they know that I know.');
   } else if (has('good') && !has('not')) {
     for (const v of near) v.trust = Math.min(100, v.trust + 3);
-    answer(['S1', 'P1']);
-  } else { understood = false; answer(['P7']); }
-  if (!understood) toast('<span>They didn’t understand that. Try a clear pairing, like “not afraid” or “not step”.</span>');
+    answer(['S1', 'P1'], 'the giant said something good; they are a little warmer');
+  } else { understood = false; answer(['P7'], 'they did not really understand what the giant meant'); }
+  const fallback = () => responders.forEach((v, i) => reply(v, v.role === 'child' && canned.includes('S1') ? 'C5' : pick(canned), 1.4 + i * 1.4));
+  if (!responders.length) return;
+  if (talkOnline()) voiceVillage('reply', r, responders, near.filter(v => !responders.includes(v) && !v.sleeping), effect).then(ok => { if (!ok) { fallback(); if (!understood) toast('<span>They didn’t understand that. Try a clear pairing, like “not afraid” or “not step”.</span>'); } });
+  else { fallback(); if (!understood) toast('<span>They didn’t understand that. Try a clear pairing, like “not afraid” or “not step”.</span>'); }
+}
+
+/* ---------- live voices: Claude writes what the villagers say back (public version only) ---------- */
+let talkSeq = 0, talkFails = 0, talkOffUntil = 0, talkBusy = false, hailT = 90, hailsToday = 0, hailDay = 0, lastTalkAt = 0;
+const TALK_ACTS = { approach: 1, flee: 1, hide: 1, gift: 1, sing: 1 };
+function talkOnline() { return !!COUNCIL_URL && !TEST_NO_TALK() && Date.now() > talkOffUntil; }
+function TEST_NO_TALK() { return !!window.__ggNoTalk; }
+function personFor(v) {
+  return { name: v.name, role: ROLE_TITLE[v.role] || v.role, child: v.role === 'child' || (v === PIM && pimStage < 2), fear: Math.round(v.fear), trust: Math.round(v.trust), anger: Math.round(v.anger || 0), grief: v.grudgeFor || null, faction: factionOf(v), doing: v.activity || '', memories: (v.journal || []).slice(-3), talk: (v.talk || []).slice(-3) };
+}
+function talkPayload(kind, said, speakers, overhearers, effect) {
+  return {
+    kind, said, effect,
+    world: { day: dayNum, time: phaseLabel(tDay).toLowerCase(), season, weather: weather.kind, giantName: giantKind === 'goddess' ? 'Vela' : 'Oru', giantKneeling: !!giant.kneeling,
+      revolt: ['calm', 'restless', 'defiant', 'in revolt'][revoltStage], tyrantRule: tyrant, homesDestroyed: homesLost, struckDownByLightning: fallen.map(v => v.name), giantAspect: aspect,
+      known: knownWords(), recent: village.log.slice(-3).map(l => `day ${l.day}: ${l.text}`) },
+    speakers: speakers.slice(0, 2).map(personFor), overhearers: overhearers.slice(0, 2).map(personFor),
+  };
+}
+async function voiceVillage(kind, said, speakers, overhearers, effect) {
+  if (talkBusy || (kind === 'reply' && Date.now() - lastTalkAt < 4000)) return false;
+  talkBusy = true; lastTalkAt = Date.now();
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), kind === 'hail' ? 12000 : 7000);
+  const everyone = [...speakers, ...overhearers];
+  if (kind === 'reply') for (const v of speakers.slice(0, 1)) thinkingDots(v);
+  try {
+    const r = await fetch(COUNCIL_URL + '/talk', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ player: playerId(), payload: talkPayload(kind, said, speakers, overhearers, effect) }), signal: ctl.signal });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'server said ' + r.status);
+    const lines = (j.lines || []).filter(l => everyone.some(v => v.name === l.name) && Array.isArray(l.words) && l.words.length && l.words.every(id => ROOTS[id]));
+    if (!lines.length) throw new Error('no usable lines');
+    talkFails = 0;
+    const saidEn = said.map(id => id === 'name' ? '[our name for it]' : ROOTS[id].en).join(' ');
+    lines.forEach((l, i) => {
+      const v = everyone.find(o => o.name === l.name);
+      const bad = l.feel < 0 && l.words.some(id => id === 'fight' || id === 'stone' || id === 'dead' || id === 'go');
+      const line = { id: 'V' + (++talkSeq), r: l.words.slice(0, 5), en: String(l.en).slice(0, 120), bad, live: true };
+      replies.push({ v, line, t: gameTime + 0.6 + i * 1.5, whisper: !!l.whisper });
+      if (!v.talk) v.talk = [];
+      v.talk.push(kind === 'hail' ? `I said to the giant: "${line.en}"` : `the giant said "${saidEn}", I ${l.whisper ? 'whispered' : 'answered'}: "${line.en}"`);
+      if (v.talk.length > 4) v.talk.shift();
+      v.trust = clamp(v.trust + l.feel * 3, 0, 100); v.fear = clamp(v.fear - l.feel * 4, 0, 100);
+      if (TALK_ACTS[l.act]) doTalkAct(v, l.act);
+    });
+    return true;
+  } catch (e) {
+    if (++talkFails >= 3) { talkOffUntil = Date.now() + 120000; talkFails = 0; }
+    village.lastError = String(e.message || e).slice(0, 60);
+    return false;
+  } finally { clearTimeout(timer); talkBusy = false; }
+}
+function doTalkAct(v, act) {
+  if (v.dead) return;
+  if (act === 'approach' && !v.grudge) { v.comeT = gameTime + 25; v.fear = Math.max(0, v.fear - 10); }
+  else if (act === 'flee') v.fear = Math.min(100, v.fear + 25);
+  else if (act === 'hide') v.sentHome = gameTime + 40;
+  else if (act === 'sing') v.singT = gameTime + 25;
+  else if (act === 'gift' && isAdult(v) && v.trust > 30 && !v.grudge && !v.bring) v.bring = 'flowers';
+  v.thinkT = 0;
+}
+function thinkingDots(v) {
+  const el = document.createElement('div'); el.className = 'bubble'; el.innerHTML = `<span class="who">${ROLE_TITLE[v.role]} ${v.name}</span><div class="dots">· · ·</div>`;
+  $('#bubbles').appendChild(el); bubbles.push({ el, v, t: 1.6, line: { r: [] } });
+}
+// sometimes, when you kneel close and stay quiet, someone speaks to you first
+function updateHail(dt) {
+  if (!talkOnline() || ending || paused) return;
+  hailT -= dt; if (hailT > 0) return;
+  hailT = rand(40, 60);
+  if (hailDay !== dayNum) { hailDay = dayNum; hailsToday = 0; }
+  if (hailsToday >= 4 || Date.now() - lastTalkAt < 60000) return;
+  if (!giant.kneeling || phaseOf(tDay) === 'night' || revoltStage >= 3) return;
+  const near = villagers.filter(v => !v.dead && !v.hidden && !v.sleeping && !v.riding && hyp(v.x - giant.x, v.z - giant.z) < 50 && v.fear < 70);
+  if (!near.length) return;
+  const sp = near.sort((a, b) => (b.trust + (b.anger || 0)) - (a.trust + (a.anger || 0)))[Math.random() < 0.6 ? 0 : Math.floor(Math.random() * near.length)];
+  hailT = rand(150, 220); hailsToday++;
+  voiceVillage('hail', [], [sp], near.filter(v => v !== sp), '');
 }
 
 /* =========================================================
@@ -3055,7 +3140,7 @@ function showEnding(key) {
 
 function updateStory(dt) {
   smiteCd = Math.max(0, smiteCd - dt);
-  updateSwarm(dt); updateShaping(dt); updateSeasons(dt); updateAspects(dt); updateGrief(dt); updatePimBond(dt); updateKeeper(dt);
+  updateSwarm(dt); updateHail(dt); updateShaping(dt); updateSeasons(dt); updateAspects(dt); updateGrief(dt); updatePimBond(dt); updateKeeper(dt);
   checkStory();
   processReplies();
   updatePim(dt);

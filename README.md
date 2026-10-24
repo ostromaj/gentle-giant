@@ -24,3 +24,13 @@ Walk the valley as Oru or Vela, decode the villagers' glyph language and secret 
 | `PER_PLAYER_PER_HOUR` / `PER_IP_PER_HOUR` | Rate limits. | `20` / `40` |
 
 The daily spend counter lives in memory, so it resets if the server restarts. Set a monthly spend limit in the Claude Console as a backstop.
+
+### Live talk
+
+When you speak to the villagers on the public version, `POST /talk` asks Claude to write their answers in glyphs. Each answer costs about $0.0002. Extra settings:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `TALK_SHARE` | `0.6` | Talk can use at most this share of `DAILY_CAP_USD`, so the nightly council always has budget |
+| `TALK_PER_PLAYER_PER_HOUR` | `40` | Talk calls per player per hour |
+| `TALK_PER_IP_PER_HOUR` | `80` | Talk calls per IP per hour |
