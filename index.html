@@ -82,7 +82,7 @@ kbd { font-family: var(--font-body); font-size: 11px; font-weight: 800; border: 
 .build { font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--wheat); }
 #start h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(48px, 9vw, 104px); line-height: .95; margin: 0; color: var(--bone); text-wrap: balance; text-shadow: 0 6px 40px rgba(20,16,30,.6); }
 .tag { font-family: var(--font-display); font-size: clamp(17px, 2.2vw, 21px); margin: 0; color: var(--bone); opacity: .88; }
-.picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; text-align: left; }
+.picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; text-align: left; }
 .pick { background: rgba(241,234,217,.08); border: 2px solid rgba(241,234,217,.22); border-radius: 18px; padding: 18px 20px; color: var(--bone); display: grid; gap: 6px; transition: background .2s, border-color .2s, transform .2s; }
 .pick:hover { background: rgba(241,234,217,.14); border-color: var(--wheat); transform: translateY(-2px); }
 .pick .nm { font-family: var(--font-display); font-size: 30px; line-height: 1.1; }
@@ -210,6 +210,11 @@ body.touch #monologue { bottom: calc(200px + env(safe-area-inset-bottom, 0px)); 
 body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { display: none !important; }
 #epi-cap { position: fixed; left: 50%; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(720px, calc(100% - 32px)); text-align: center; z-index: 17; font-family: var(--font-display); font-size: clamp(20px, 3vw, 30px); color: var(--bone); text-shadow: 0 2px 18px rgba(20,16,30,.9); opacity: 0; transition: opacity 1.2s; pointer-events: none; text-wrap: balance; }
 #epi-cap.on { opacity: 1; }
+#vm-council { position: fixed; inset: 0; z-index: 18; display: grid; place-items: center; background: rgba(18,14,28,.6); padding: 24px 16px; }
+.vmc-opts { display: grid; gap: 8px; }
+.vmc-opts button { text-align: left; border: 2px solid var(--ink); background: transparent; color: var(--ink); border-radius: 12px; padding: 10px 14px; font-weight: 800; }
+.vmc-opts button:hover { background: rgba(43,34,51,.08); }
+.vmc-opts button.quiet { border-style: dashed; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 
@@ -221,6 +226,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
   <span class="chip" id="season"><span id="season-text">Summer</span></span>
   <span class="chip" id="saved" hidden>Saved</span>
   <span class="chip mood" id="mood" hidden><span class="dot"></span><span id="mood-text">Calm</span></span>
+  <span class="chip mood" id="gmood" hidden><span class="dot"></span>Giant: <span id="gmood-text">Content</span></span>
   <span class="chip" id="wounds" hidden>Wounds <span class="bar"><span class="fill" id="wounds-fill"></span></span></span>
 </div>
 <div id="reticle" hidden></div>
@@ -262,7 +268,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 
 <section id="start" aria-labelledby="title">
   <div class="start-inner">
-    <div class="build">Playable build 0.12</div>
+    <div class="build">Playable build 0.13</div>
     <h1 id="title">Gentle Giant</h1>
     <p class="tag">They sing for you every night. Learn what they're singing.</p>
     <button class="continue" type="button" id="continue" hidden><b>Continue</b><span id="continue-sub"></span></button>
@@ -272,6 +278,11 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
         <span class="ti">The god</span>
         <span class="nm">Oru</span>
         <span class="ds">Broad and slow, silver-haired, with a long beard and a rust-red cape. The villagers call him the Mountain Who Walks.</span>
+      </button>
+      <button class="pick" type="button" data-kind="villager">
+        <span class="ti">New · play as a villager</span>
+        <span class="nm">Tam</span>
+        <span class="ds">A young farmer, three steps tall. The giant thinks you all love it. Make that true, or drive it out of the valley.</span>
       </button>
       <button class="pick" type="button" data-kind="goddess">
         <span class="ti">The goddess</span>
@@ -328,6 +339,15 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
   </div>
 </section>
 
+<section id="vm-council" hidden aria-labelledby="vmc-title">
+  <div class="end-inner">
+    <div class="build" style="color:#8a6a22">The council at the hall</div>
+    <h2 id="vmc-title">What should we do about the giant?</h2>
+    <p>Everyone is looking at you. Whatever you say, the village will try tomorrow.</p>
+    <div class="vmc-opts" id="vm-council-opts"></div>
+  </div>
+</section>
+
 <section id="endcard" hidden aria-labelledby="end-title">
   <div class="end-inner">
     <div class="build" style="color:#8a6a22" id="end-label">Ending</div>
@@ -345,6 +365,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 <script>
 (() => {
 'use strict';
+var VM = { on: false };   // play-as-a-villager mode (set from the title screen)
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -1767,8 +1788,9 @@ const ROLE_LOOK = {
   farmer:  { col: 0x7d8f4e, hat: 'straw' },
   carrier: { col: 0x4f7f8a, pot: true },
   baker:   { col: 0xc99a5a, apron: true },
+  stargazer: { col: 0x34406e }, inventor: { col: 0x8a6a3a }, architect: { col: 0x3d3f4a }, visionary: { col: 0x26232c }, astronaut: { col: 0xeeeae0 },
 };
-const ROLE_TITLE = { keeper: 'Keeper', rebel: 'Rebel', wanderer: 'Wanderer', child: 'Child', mother: 'Mother', priest: 'Priest', elder: 'Elder', skeptic: 'Skeptic', builder: 'Builder', farmer: 'Farmer', carrier: 'Water carrier', baker: 'Baker' };
+const ROLE_TITLE = { stargazer: 'Stargazer', inventor: 'Inventor', architect: 'Tower-Builder', visionary: 'Rocket Maker', astronaut: 'Star Pilot', keeper: 'Keeper', rebel: 'Rebel', wanderer: 'Wanderer', child: 'Child', mother: 'Mother', priest: 'Priest', elder: 'Elder', skeptic: 'Skeptic', builder: 'Builder', farmer: 'Farmer', carrier: 'Water carrier', baker: 'Baker' };
 const skinTones = [0xe0b48f, 0xc9966f, 0xa8775a, 0xe8c4a0, 0x8f6248];
 
 // bake many small parts into one vertex-coloured mesh, so a detailed villager stays cheap to draw
@@ -1811,7 +1833,7 @@ function makeVillagerMesh(role) {
   const cloth = look.col, clothC = new THREE.Color(cloth);
   const trouser = clothC.clone().multiplyScalar(0.5).getHex(), trim = clothC.clone().lerp(new THREE.Color(0xf1ead9), 0.45).getHex();
   const hair = look.hair || pick(hairTones);
-  const robe = role === 'priest' || role === 'elder' || role === 'mother';
+  const robe = role === 'priest' || role === 'elder' || role === 'mother' || role === 'stargazer';
   const hs = child ? 1.18 : 1;                       // children have bigger heads
   const HY = 2.5, HR = 0.5 * hs;
   const S = V_GEO, parts = [];
@@ -1853,7 +1875,13 @@ function makeVillagerMesh(role) {
   if (role === 'wanderer') { P(S.box, 0x6d4a32, 0, 1.45, -0.58, 0.7, 0.8, 0.35); P(S.cyl, 0x8f6a50, 0, 1.92, -0.58, 0.18, 0.75, 0.18, 0, 0, Math.PI / 2); }
   if (role === 'keeper') P(S.sph, 0x5f7f43, 0, 1.4, -0.36, 0.66, 0.95, 0.24);
   if (child) P(S.box, 0x8f6a50, 0.42, 1.0, 0.1, 0.22, 0.26, 0.12);
+  if (role === 'stargazer') { P(S.cone, 0x26305a, 0, HY + 0.85, 0, 0.55, 1.4, 0.55); for (let k = 0; k < 5; k++) P(S.sphLo, 0xf4e3a0, Math.cos(k * 1.3) * 0.42, HY + 0.45 + k * 0.17, Math.sin(k * 1.3) * 0.42, 0.06, 0.06, 0.06); }
+  if (role === 'inventor') { for (const sx of [-1, 1]) P(S.ring, 0xb08a3a, sx * 0.18, HY + 0.3, HR * 0.75, 0.13, 0.13, 0.6); P(S.ring, 0x5e4430, 0, HY + 0.3, 0, HR * 1.02, HR * 1.02, 0.4, Math.PI / 2); P(S.box, 0x5e4430, 0, 0.95, 0.45, 0.9, 0.3, 0.12); }
+  if (role === 'architect') { P(S.cyl, 0x1d1a1f, 0, HY + 0.75, 0, 0.42, 0.75, 0.42); P(S.cyl, 0x1d1a1f, 0, HY + 0.38, 0, 0.7, 0.05, 0.7); P(S.box, 0xf1ead9, 0, 1.75, 0.5, 0.18, 0.5, 0.04); P(S.box, 0xa4443a, 0, 1.55, 0.53, 0.1, 0.35, 0.03); }
+  if (role === 'visionary') { P(S.box, 0x3d3a44, 0, 1.3, 0.54, 0.6, 0.6, 0.02); P(S.box, 0xdcdcdc, 0, 1.38, 0.555, 0.22, 0.22, 0.02); }
+  if (role === 'astronaut') { P(S.ring, 0xd9783a, 0, 1.3, 0, 0.56, 0.56, 1.2, Math.PI / 2); P(S.ring, 0xd9783a, 0, 1.75, 0, 0.53, 0.53, 1.2, Math.PI / 2); P(S.box, 0x2f6f74, 0, 1.6, 0.56, 0.3, 0.2, 0.04); P(S.box, 0xd9d9d9, 0, 1.4, -0.6, 0.75, 0.9, 0.35); }
   const bodyMesh = new THREE.Mesh(bakeParts(parts), vmat); bodyMesh.castShadow = true; body.add(bodyMesh);
+  if (role === 'astronaut') { const helm = new THREE.Mesh(new THREE.SphereGeometry(HR * 1.35, 16, 12), new THREE.MeshStandardMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.2 })); helm.position.y = HY; body.add(helm); }
   // legs (they swing when walking)
   const legs = [];
   for (const sx of [-1, 1]) {
@@ -1867,6 +1895,10 @@ function makeVillagerMesh(role) {
     const piv = new THREE.Group(); piv.position.set(sx * 0.62, 1.78, 0); body.add(piv);
     const ap = [[S.cap, cloth, 0, -0.36, 0, 0.17, 0.28, 0.17], [S.ring, trim, 0, -0.66, 0, 0.15, 0.15, 0.5, Math.PI / 2], [S.sph, skinHex, 0, -0.8, 0, 0.15, 0.16, 0.14], [S.sphLo, skinHex, sx * -0.1, -0.74, 0.08, 0.05, 0.08, 0.05]];
     if (sx === -1 && (role === 'elder' || role === 'keeper')) ap.push([S.cyl, 0x6f5238, 0, -1.0, 0.18, 0.06, 2.6, 0.06, 0.35]);
+    if (sx === -1 && role === 'stargazer') ap.push([S.cyl, 0xb08a3a, 0, -0.85, 0.35, 0.1, 0.9, 0.1, 1.2], [S.ring, 0x3a3540, 0, -0.85, 0.8, 0.11, 0.11, 0.5]);
+    if (sx === -1 && role === 'architect') ap.push([S.cyl, 0x4f86b0, 0, -0.8, 0.25, 0.12, 1.1, 0.12, 1.3]);
+    if (sx === -1 && role === 'visionary') ap.push([S.cyl, 0xf1ead9, 0, -0.95, 0.2, 0.1, 0.55, 0.1], [S.cone, 0xc9493c, 0, -0.55, 0.2, 0.1, 0.22, 0.1]);
+    if (sx === -1 && role === 'inventor') ap.push([S.cyl, 0x8c8c8c, 0, -0.95, 0.2, 0.05, 0.6, 0.05, 0.4]);
     const am = new THREE.Mesh(bakeParts(ap), vmat); am.castShadow = true; piv.add(am);
     piv.rotation.z = sx * 0.12; arms.push(piv);
     if (sx === 1) {
@@ -1895,7 +1927,8 @@ const CAST = [
   { name: 'Joss',  role: 'carrier', home: 8 },
   { name: 'Hob',   role: 'baker',   home: 6 },
 ];
-const villagers = CAST.map((c, i) => {
+const villagers = CAST.map((c, i) => spawnVillager(c, i));
+function spawnVillager(c, i) {
   const home = c.home === 'hall' ? HALL : houses[c.home];
   const m = makeVillagerMesh(c.role);
   const a = rand(0, Math.PI * 2);
@@ -1908,7 +1941,7 @@ const villagers = CAST.map((c, i) => {
     memory: [], carryToggle: false, activity: 'walking', lastHeardSpeak: -99,
   });
   return v;
-});
+}
 const byName = n => villagers.find(v => v.name === n);
 const MARA = byName('Mara');
 const PIM = byName('Pim'), WREN = byName('Wren'), OSWEN = byName('Oswen'), DOV = byName('Dov'), KETT = byName('Kett'), ROOK = byName('Rook');
@@ -1968,6 +2001,7 @@ const said = new Set();
 const monoQ = [];
 let monoT = 0, monoGap = 0;
 function think(key, text, force) {
+  if (VM.on) return;
   if (said.has(key) && !force) return;
   said.add(key); monoQ.push(text);
 }
@@ -1998,6 +2032,17 @@ function glyphHTML(id, misfitIds, script) {
   else if (w.guess) { label = w.guess + '?'; cls = 'guess'; }
   return `<span class="g${misfitIds && misfitIds.has(id) ? ' misfit' : ''}"><img src="${GLYPH[id]}" alt=""><small class="${cls}">${label}</small></span>`;
 }
+LINES.VS1 = { r: ['sun', 'not', 'big'], en: 'Up there, the sun is not so big.', k: 'pub' };
+LINES.VS2 = { r: ['sun', 'sun', 'sun', 'good'], en: 'So many suns up there. Good.', k: 'pub' };
+LINES.IN1 = { r: ['fire', 'not', 'fire'], en: 'Fire without flame! Light in a jar.', k: 'pub' };
+LINES.IN2 = { r: ['fire', 'good', 'home'], en: 'Light, for every home.', k: 'pub' };
+LINES.AR1 = { r: ['big', 'home', 'big'], en: 'A big home. No, bigger.', k: 'pub' };
+LINES.AR2 = { r: ['home', 'big', 'not', 'afraid'], en: 'Build big, and be afraid of nothing.', k: 'pub' };
+LINES.VI1 = { r: ['go', 'sun', 'big', 'good'], en: 'We go past the sun. Big. Good.', k: 'pub' };
+LINES.VI2 = { r: ['big', 'not', 'big'], en: 'The giant, big? Not compared to the sky.', k: 'pub' };
+LINES.VI3 = { r: ['not', 'afraid', 'go'], en: 'Do not be afraid. Go!', k: 'pub' };
+LINES.AS1 = { r: ['go', 'not', 'afraid'], en: 'I go, and I am not afraid.', k: 'pub' };
+LINES.AS2 = { r: ['name', 'go', 'sun'], en: 'Our great one goes with me, past the sun.', k: 'pub' };
 LINES.H1 = { r: ['please', 'home'], en: 'Please... home? Put me home?', k: 'honest' };
 LINES.H2 = { r: ['afraid', 'afraid', 'please'], en: 'Afraid, so afraid. Please.', k: 'honest' };
 LINES.H3 = { r: ['big', 'not', 'step', 'please'], en: 'Big one, please, do not drop me.', k: 'honest' };
@@ -2100,6 +2145,7 @@ function updateBubbles(dt) {
 function chooseLine(v, watched) {
   const ph = phaseOf(tDay), f = v.fear, pool = [];
   const push = (id, w = 1) => { for (let i = 0; i < w; i++) pool.push(id); };
+  if (v.visitor) { for (const id of v.visitor.lines) push(id); return LINES[pick(pool)]; }
   const recentCrush = v.memory.some(m => m.type === 'crush' && gameTime - m.t < 90);
   const recentFlood = v.memory.some(m => m.type === 'flood' && gameTime - m.t < 90);
   const recentGift = v.memory.some(m => m.type === 'gift' && gameTime - m.t < 90);
@@ -2199,6 +2245,7 @@ function riverSpot() { const z = VC.z + rand(-25, 25); return { x: riverX(z) - 1
 function fieldSpot(fi) { const f = FIELDS[fi]; return { x: f.x + rand(-f.w / 2 + 3, f.w / 2 - 3), z: f.z + rand(-f.d / 2 + 3, f.d / 2 - 3) }; }
 
 function brain(v) {
+  if (v.player) return;
   const ph = phaseOf(tDay);
   const d = hyp(v.x - giant.x, v.z - giant.z);
   if (v.riding || v.sleeping || (ending && ending.kind === 'leave' && v.state === 'sleep')) return;
@@ -2228,6 +2275,7 @@ function brain(v) {
   if (v.fear > 62 && d < 90) { v.state = 'flee'; v.target = homeOf(v).door; v.activity = 'running from you'; return; }
   if (v.fear > 38 && d < 46 && !(v.planId && village.plans.some(p => p.id === v.planId && p.sprung))) { v.state = 'cower'; v.target = null; v.activity = 'cowering'; return; }
   if (swarmBrain(v)) return;
+  if (v.visitor && visitorBrain(v, ph)) return;
   if (ph === 'night') {
     if ((v === KETT || v === ROOK) && tDay < 0.93) { v.state = 'meet'; v.target = { x: WELL.x + (v === KETT ? -2.5 : 2.5), z: WELL.z + 2 }; v.activity = 'meeting in secret by the well'; return; }
     v.state = 'home'; v.target = homeOf(v).door; v.activity = 'going home'; return;
@@ -2306,7 +2354,8 @@ function updateVillager(v, dt) {
   }
   // movement
   let speed = 0;
-  if (v.diveT > 0) { v.diveT -= dt; v.vx *= 1 - dt * 3; v.vz *= 1 - dt * 3; }
+  if (v.player) vmMove(v, dt);
+  else if (v.diveT > 0) { v.diveT -= dt; v.vx *= 1 - dt * 3; v.vz *= 1 - dt * 3; }
   else if (v.target && v.state !== 'cower') {
     const dx = v.target.x - v.x, dz = v.target.z - v.z, dd = hyp(dx, dz);
     const run = v.state === 'flee' || v.state === 'exodus' || v.state === 'betray' || (v.state === 'home' && phaseOf(tDay) === 'night');
@@ -2366,6 +2415,7 @@ function updateVillager(v, dt) {
     if (m.legs) { const ls = Math.sin(v.walkPh) * Math.min(sp / 4, 1.1) * 0.7; m.legs[0].rotation.x = lerp(m.legs[0].rotation.x, -ls - v.crouch * 0.9, dt * 10); m.legs[1].rotation.x = lerp(m.legs[1].rotation.x, ls - v.crouch * 0.9, dt * 10); }
   }
   // speech
+  if (v.player) return;
   v.speakCd -= dt;
   if (v.speakCd <= 0) {
     const hr = hearRange();
@@ -2430,6 +2480,7 @@ function treeNear() {
   return best;
 }
 function actionHint() {
+  if (VM.on) return vmHint();
   if (!giant.model || giant.pourT > 0 || (ending && ending.kind !== 'leave')) return '';
   if (giant.reach || giant.throwA || giant.squeeze) return '';
   if (giant.held && !giant.carry) return `<kbd>F</kbd> Set ${giant.held.name} down gently` + (isAdult(giant.held) ? ' &nbsp; <kbd>Q</kbd> Crush' : '');
@@ -2445,7 +2496,8 @@ function actionHint() {
   if (treeNear()) return '<kbd>F</kbd> Pick fruit from the tree';
   return '';
 }
-function useAction() {
+function useAction() { if (VM.on) return vmUse(); return giantUse(); }
+function giantUse() {
   const G = giant;
   if (!G.model || G.pourT > 0 || G.reach || G.throwA || G.squeeze || paused || (ending && ending.kind !== 'leave')) return;
   if (G.held && !G.carry) { startReach('low', () => putDown()); return; }
@@ -2586,6 +2638,7 @@ function footstep(fx, fz) {
   burst(fx, Math.max(fy, wet ? WATER_Y : fy), fz, light ? 5 : 12, wet ? 'splash' : 'dust');
   sfxStep(light, wet);
   if (!light && !loading) stompSite(fx, fz);
+  if (VM.on) vmFootstep(fx, fz, light);
   for (const h of houses) {
     if (h.crushed) continue;
     const d = hyp(fx - h.x, fz - h.z);
@@ -2693,6 +2746,7 @@ function findTarget() {
   return best;
 }
 function smite() {
+  if (VM.on) return vmThrow();
   if (!started || paused || ending) return;
   if (giant.held) { crushHeld(); return; }
   if (smiteCd > 0 || giant.throwA || giant.reach) return;
@@ -2757,6 +2811,8 @@ function killVillager(v, how = 'sky') {
     o.memory.push({ type: 'smite', t: gameTime, who: v.name, justified });
     o.speakCd = Math.min(o.speakCd, rand(1.5, 4));
   }
+  if (VM.on && v === VM.me) { if (TEST) console.log('VMDBG killed', how, new Error().stack.split('\n').slice(2, 5).join(' | ')); setTimeout(() => showEnding('vm_struck'), 1800); }
+  if (v.visitor) village.visitorsGone.push(v.name);
   if (how === 'hand') think('crush-hand', 'I closed my hand. It was so easy. I felt it.', true);
   else if (justified) think('smite-just', 'They spoke against me. Now they know what I am.');
   else think('smite-innocent', 'What did I just do? That one never said a word against me.');
@@ -2819,7 +2875,7 @@ function throwAt(v, fire) {
   const m = new THREE.Mesh(stoneGeo, fire ? arrowMat : stoneMat);
   if (fire) m.scale.set(0.45, 0.45, 2); else m.castShadow = true;
   m.position.set(sx, sy, sz); scene.add(m);
-  shots.push({ m, vx: (tx - sx) / T, vy: (ty - sy + 0.5 * g * T * T) / T, vz: (tz - sz) / T, t: 0, T, g, fire });
+  shots.push({ m, vx: (tx - sx) / T, vy: (ty - sy + 0.5 * g * T * T) / T, vz: (tz - sz) / T, t: 0, T, g, fire, by: v });
   v.throwAnim = 0.45;
 }
 function updateShots(dt) {
@@ -2830,7 +2886,7 @@ function updateShots(dt) {
     if (s.t >= s.T) {
       scene.remove(s.m); shots.splice(i, 1);
       burst(s.m.position.x, s.m.position.y, s.m.position.z, s.fire ? 8 : 5, s.fire ? 'fire' : 'dust');
-      sfxHit(s.fire); hurt(s.fire ? 1.4 : 0.6);
+      sfxHit(s.fire); hurt(s.fire ? 1.4 : 0.6); if (VM.on) vmGiantHit(s.by, s.fire);
     }
   }
 }
@@ -2839,7 +2895,7 @@ function hurt(n) {
   pain = Math.min(100, pain + n); painQuietT = 5; shake = Math.min(1.6, shake + 0.15);
   think('hit1', 'Ow. They are throwing stones at me. At me!');
   if (pain > 60) think('hit60', 'It is only stones, but there are so many of them.');
-  if (pain >= 100) showEnding('castout');
+  if (pain >= 100) { if (VM.on) { if (!VM.leaving) { VM.leaving = 'drove'; toast('<span>The giant is retreating toward the pass!</span>'); } } else showEnding('castout'); }
 }
 
 // ---------- palisade ----------
@@ -2972,6 +3028,7 @@ function doSpeak() {
   if (!sentence.length) return;
   const r = sentence.slice(), mode = speakMode;
   closeSpeak();
+  if (VM.on) { vmSpeakToGiant(r); return; }
   const el = document.createElement('div'); el.className = 'bubble giant-b';
   el.innerHTML = `<span class="who">You${giant.kneeling ? ', softly' : ', booming'}</span>` + giantLineHTML(r);
   $('#bubbles').appendChild(el); bubbles.push({ el, v: giantSpeaker, t: 5.5, line: { r }, giant: true });
@@ -3046,7 +3103,7 @@ function interpret(r) {
 /* ---------- live voices: Claude writes what the villagers say back (public version only) ---------- */
 let talkSeq = 0, talkFails = 0, talkOffUntil = 0, talkBusy = false, hailT = 90, hailsToday = 0, hailDay = 0, lastTalkAt = 0;
 const TALK_ACTS = { approach: 1, flee: 1, hide: 1, gift: 1, sing: 1 };
-function talkOnline() { return !!COUNCIL_URL && !TEST_NO_TALK() && Date.now() > talkOffUntil; }
+function talkOnline() { return !VM.on && !!COUNCIL_URL && !TEST_NO_TALK() && Date.now() > talkOffUntil; }
 function TEST_NO_TALK() { return !!window.__ggNoTalk; }
 function personFor(v) {
   return { name: v.name, role: ROLE_TITLE[v.role] || v.role, child: v.role === 'child' || (v === PIM && pimStage < 2), fear: Math.round(v.fear), trust: Math.round(v.trust), anger: Math.round(v.anger || 0), grief: v.grudgeFor || null, faction: factionOf(v), doing: v.activity || '', memories: (v.journal || []).slice(-3), talk: (v.talk || []).slice(-3) };
@@ -3154,7 +3211,7 @@ function dropGift(v, kind) {
 }
 function updatePim(dt) {
   if (PIM.riding) { PIM.fear = Math.max(0, PIM.fear - dt * 2); return; }
-  if (!ending && pimStage < 2 && stilled() && (giant.stillT > 8 || aspect === 'moss') && (PIM.trust > 60 || (aspect === 'moss' && PIM.trust > 40)) && PIM.fear < 18 && !PIM.hidden && !giant.carry && !giant.held && !giant.reach && hyp(PIM.x - giant.x, PIM.z - giant.z) < 34) {
+  if (!VM.on && !ending && pimStage < 2 && stilled() && (giant.stillT > 8 || aspect === 'moss') && (PIM.trust > 60 || (aspect === 'moss' && PIM.trust > 40)) && PIM.fear < 18 && !PIM.hidden && !giant.carry && !giant.held && !giant.reach && hyp(PIM.x - giant.x, PIM.z - giant.z) < 34) {
     pickUp(PIM);
     think('pimride', 'The little one climbed right into my hand. It is not afraid of me at all.');
     toast('<span>Pim climbed into your hand. Press <kbd style="color:var(--ink);border-color:var(--ink)">F</kbd> to set them down gently.</span>');
@@ -3196,6 +3253,7 @@ function readTablet() {
   think('tablet', 'Their name for me, and three marks that explain it. I must learn those marks.');
 }
 function checkStory() {
+  if (VM.on) return;
   if (!scriptActive && lockedCount() >= 9 && dayNum >= 2) {
     scriptActive = true;
     toast('<span>They noticed you understand them. Their whispers now use a secret script.</span>');
@@ -3331,6 +3389,12 @@ const ENDINGS = {
   feared: { label: 'Ending · Stay', title: 'A statue beside an empty valley.', body: 'You knelt, spoke, and turned to stone, but they had already heard too much from you. By spring they followed the Skeptic over the pass and did not look back. Grass grows over you now. Nobody sings.' },
   castout: { label: 'Ending · Revolt', title: 'Driven out.', body: 'Stone by stone and rope by rope, they did what you thought was impossible. You limp out through the pass with their stones still rattling off your back. Behind you, for the first time, they are singing for themselves.' },
   tyrant: { label: 'Ending · Revolt', title: 'They kneel.', body: 'The last of them dropped to their knees. The songs will be louder now, and the offerings bigger, and every word of it will be a lie. You wanted to be loved. This is what you got instead.', keep: true },
+  vm_friend: { label: 'Ending · Villager', title: 'Friends with a mountain.', body: 'At dusk it knelt beside the plaza and held out its hand, and you climbed in. From up there the valley looked small and safe. The others stopped whispering. There was nothing left to hide.' },
+  vm_drove: { label: 'Ending · Villager', title: 'We drove it out.', body: 'Stone by stone, the village did what everyone said was impossible. It limped away through the pass. You won. The fields are quiet now, and nobody waters them when the rain does not come.' },
+  vm_asked: { label: 'Ending · Villager', title: 'It left because we asked.', body: 'You said it to its face: please, big one, go. It looked at you for a long time. Then it walked away through the pass, carefully, stepping around every roof.' },
+  vm_struck: { label: 'Ending · Villager', title: 'It noticed you.', body: 'You thought you were too small to matter. You were wrong.' },
+  vm_crushed: { label: 'Ending · Villager', title: 'Underfoot.', body: 'It was so angry it never even looked down.' },
+  vm_left: { label: 'Ending · Villager', title: 'Over the pass.', body: 'You walked out of the valley and did not look back. Behind you, something enormous sat down and waited for you to come home.' },
   empty: { label: 'Ending', title: 'The valley is quiet.', body: 'There is no one left to sing to you, or to lie to you, or to beg you to go.' },
 };
 function showEnding(key) {
@@ -3350,7 +3414,7 @@ function updateStory(dt) {
   updateSwarm(dt); updateHail(dt); updateShaping(dt); updateSeasons(dt); updateAspects(dt); updateGrief(dt); updatePimBond(dt); updateKeeper(dt);
   checkStory();
   processReplies();
-  updateHeld(); updatePim(dt); updateRocks(dt); updateGrowth(dt); updateAges(dt);
+  updateHeld(); updatePim(dt); updateRocks(dt); updateGrowth(dt); updateAges(dt); vmUpdate(dt);
   updateGifts(dt);
   updateRevolt(dt);
   updateFires(dt);
@@ -3360,7 +3424,7 @@ function updateStory(dt) {
   if (ending && ending.kind === 'leave' && !ending.done && hyp(giant.x - PASS.x, giant.z - PASS.z) < 22) showEnding(ending.harm === 0 ? 'clean' : 'storm');
   // smite reticle
   const rt = $('#reticle');
-  smiteTarget = (!ending && !paused) ? findTarget() : null;
+  smiteTarget = (!ending && !paused && !VM.on) ? findTarget() : null;
   if (smiteTarget) {
     _t.set(smiteTarget.x, height(smiteTarget.x, smiteTarget.z) + 1.6, smiteTarget.z).project(camera);
     rt.hidden = false; rt.classList.toggle('cool', smiteCd > 0);
@@ -3383,6 +3447,7 @@ const earned = new Set();
 const aspectRefs = {};
 let aspect = null, kindness = 0, tributes = 0, nightsNear = 0, mossStillT = 0, aspectProps = {}, aspectT = 0, flowerSprouts = [], devotee = null;
 function earnAspect(id) {
+  if (VM.on) return;
   if (earned.has(id) || ending) return;
   earned.add(id);
   toast(`<span>New Aspect: <b>${ASPECTS[id].name}</b>. ${ASPECTS[id].blurb} Press <kbd style="color:var(--ink);border-color:var(--ink)">R</kbd> to change Aspect.</span>`);
@@ -3391,6 +3456,7 @@ function earnAspect(id) {
   think('aspect-' + id, { bloom: 'Something is growing on me. Flowers.', storm: 'There is a storm inside me now. I can feel it wanting out.', gilded: 'Gold. They gave me so much gold.', starlit: 'At night the stars come out on my skin.', moss: 'I have been still so long that the moss has found me.' }[id]);
 }
 function cycleAspect() {
+  if (VM.on) return vmTalk(-1);
   if (!started || paused || (ending && ending.kind !== 'leave')) return;
   if (!earned.size) { toast('<span>You have no Aspects yet. Kindness, wrath, tribute, patience and long nights each awaken one.</span>'); return; }
   const list = [null].concat(ASPECT_ORDER.filter(a => earned.has(a)));
@@ -3766,6 +3832,7 @@ function shape(dir) {
   think(dir > 0 ? 'raise' : 'dig', dir > 0 ? 'The earth rises when I push it together.' : 'I can dig. If I dig deep enough, the river will follow.');
 }
 function updateShaping(dt) {
+  if (VM.on) return;
   shapeAnim = Math.max(0, shapeAnim - dt);
   const dir = keys.KeyX ? 1 : keys.KeyZ ? -1 : touchShape;
   if (dir) { shapeHoldT -= dt; if (shapeHoldT <= 0) { shapeHoldT = 0.32; shape(dir); } }
@@ -4022,7 +4089,7 @@ function snapshot() {
     v: 1, kind: giantKind, day: dayNum, t: tDay, gameTime, season,
     words: W(words), script: W(scriptW), sealedSeen, scriptActive, tablet: !!tablet, nameUnsealed,
     dead: fallen.map(v => v.name), gone: (PIM.gone ? ['Pim'] : []).concat(village.departed),
-    village: { log: village.log, rumors: village.rumors, visits: village.visits, departed: village.departed, built: village.built, site: village.site, tech: village.tech },
+    village: { log: village.log, rumors: village.rumors, visits: village.visits, departed: village.departed, built: village.built, site: village.site, tech: village.tech, visitorsGone: village.visitorsGone },
     vill: villagers.map(v => ({ n: v.name, x: +v.x.toFixed(1), z: +v.z.toFixed(1), f: v.fear | 0, tr: v.trust | 0, a: v.anger | 0, g: !!v.grudge, gf: v.grudgeFor || null, h: v.hunger | 0, j: v.journal || [] })),
     houses: houses.map(h => ({ c: h.crushed, f: +(h.flood || 0).toFixed(2) })),
     stats: { homesLost, smiteCount, smiteRevolt, giftsReceived, kindness, tributes, nightsNear, pain: pain | 0, tyrant, stakeBuild },
@@ -4036,6 +4103,7 @@ function snapshot() {
   };
 }
 function saveGame(quiet) {
+  if (VM.on) return;
   if (!started || loading || ending || !giant.model) return;
   if (store.set(SAVE_KEY, snapshot()) && !quiet) { const el = $('#saved'); el.hidden = false; el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
 }
@@ -4115,6 +4183,7 @@ ENDINGS.clean.hint = 'Leave without waking a soul'; ENDINGS.storm.hint = 'Leave,
 ENDINGS.accepted.hint = 'Stay, and be believed'; ENDINGS.feared.hint = 'Stay, and be doubted';
 ENDINGS.castout.hint = 'Lose to their revolt'; ENDINGS.tyrant.hint = 'Crush their revolt';
 ENDINGS.empty.hint = 'Leave no one';
+ENDINGS.vm_friend.hint = 'As Tam: befriend it'; ENDINGS.vm_drove.hint = 'As Tam: drive it out'; ENDINGS.vm_asked.hint = 'As Tam: ask it to go'; ENDINGS.vm_struck.hint = 'As Tam: get noticed'; ENDINGS.vm_crushed.hint = 'As Tam: get underfoot'; ENDINGS.vm_left.hint = 'As Tam: walk away';
 seasonize(TERRAIN.material, 'ground');
 for (const f of FIELDS) seasonize(f.mesh.material, 'ground');
 for (const m of GROUND_MESHES) if (m.userData.season) seasonize(m.material, m.userData.season);
@@ -4287,6 +4356,7 @@ function startCouncil() {
   if (nearHall < 34 && !stilled()) { village.councilState = 'idle'; villageLog('the council could not meet: the giant stood over the hall'); think('council-scared' + dayNum, 'They were gathering at the hall, but they saw me and scattered.'); return; }
   if (decision.rumor) { village.rumors.push(decision.rumor); if (village.rumors.length > 6) village.rumors.shift(); }
   const plans = decision.plans.map(p => Object.assign({ id: ++planSeq, day: dayNum, state: 'planned', heard: false, understood: false, line: null, mind: village.mind }, p));
+  if (VM.on && vmAtHall()) { vmCouncilChoice(plans); }
   for (const p of plans) { p.line = PLAN_LINE[p.type](p); }
   if (decision.dissent && plans[decision.dissent.plan]) plans[decision.dissent.plan].dissenter = decision.dissent.name;
   village.plans = village.plans.filter(p => p.state === 'active').concat(plans);
@@ -4317,6 +4387,7 @@ function updateCouncil(dt) {
 }
 const placeLabel = p => (PLACES[p.place] || PLACES.homes).label;
 function overheardToast(p) {
+  if (VM.on) return;
   const what = { festival: 'They plan a festival for you tomorrow.', gift: 'They plan to bring you gifts.', petition: `They will come to ask you for ${REQUESTS[p.request]}.`, ambush: `An ambush. Tomorrow, at ${placeLabel(p)}.`, lure: `A trap: food left out with stakes hidden around it, near ${placeLabel(p)}.`, exodus: 'Some of them mean to leave over the pass tonight.', watch: 'They are posting lookouts to watch for you at night.', hide_children: 'They will hide the children from you tomorrow.' }[p.type];
   toast(`<span>You overheard their plan. ${what}</span>`);
   think('plan-' + p.id, p.type === 'ambush' || p.type === 'lure' ? 'They mean to hurt me. I know where, and I know when.' : p.type === 'exodus' ? 'They would rather walk into the mountains than live beside me.' : 'They are planning something for me.');
@@ -4566,6 +4637,7 @@ canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('point
 canvas.addEventListener('wheel', e => { camZoom = clamp(camZoom * (1 + Math.sign(e.deltaY) * 0.08), 0.55, 1.7); e.preventDefault(); }, { passive: false });
 
 function toggleKneel() {
+  if (VM.on) return vmTalk(1);
   if (aspect === 'moss' && giant.kneeling) { toast('<span>You are covered in moss and can\u2019t get up. Press <kbd style="color:var(--ink);border-color:var(--ink)">R</kbd> to shake it off.</span>'); return; }
   giant.kneeling = !giant.kneeling; giant.stillT = 0;
   if (giant.kneeling) think('kneel', 'If I stay very still, maybe they will come closer.');
@@ -4669,6 +4741,7 @@ function start(kind, save) {
   $('#start').dataset.busy = '1';
   document.querySelectorAll('.pick').forEach(b => { b.disabled = true; });
   const chosen = document.querySelector(`.pick[data-kind="${kind}"] .nm`); if (chosen) chosen.textContent = 'Waking…';
+  if (kind === 'villager') { VM.on = true; kind = Math.random() < 0.5 ? 'god' : 'goddess'; }
   if (save) $('#continue').innerHTML = '<b>Waking…</b>';
   setTimeout(() => begin(kind, save), 40);
 }
@@ -4688,6 +4761,7 @@ function begin(kind, save) {
   wakeServer();
   if (save) { try { restore(save); } catch (e) { console.warn('save could not be restored', e); } }
   else setSeason('summer', true);
+  if (VM.on) { vmSetup(); return; }
   setTimeout(() => { if (!said.has('nbHint')) { said.add('nbHint'); toast('<span>Press <kbd style="color:var(--ink);border-color:var(--ink)">N</kbd> to open your notebook and guess what their glyphs mean.</span>'); } }, 32000);
 }
 function LINES_NAME(kind) { ROOTS.name.syl = kind === 'goddess' ? 'velaar' : 'oruval'; }
@@ -5102,6 +5176,7 @@ function techDawn() {
   if (ending) return;
   const T = villageMoodAvg(), ad = villagers.filter(v => !v.dead && isAdult(v));
   if ((T.trust >= 30 || tyrant) && revoltStage < 2 && ad.length >= 4) { village.tech++; applyEra(false); }
+  visitorsCheck(false);
   launchedToday = false;
 }
 function updateAges(dt) {
@@ -5128,7 +5203,296 @@ function updateAges(dt) {
     }
   }
 }
-function restoreAges(V) { village.tech = (V && V.tech) || 0; applyEra(true); }
+function restoreAges(V) { village.tech = (V && V.tech) || 0; village.visitorsGone = (V && V.visitorsGone) || []; applyEra(true); visitorsCheck(true); }
+
+/* =========================================================
+   NOTABLE VISITORS: on good days, as the ages turn, someone remarkable arrives
+   ========================================================= */
+const VISITORS = [
+  { era: 1, name: 'Orrin', role: 'stargazer', lines: ['VS1', 'VS2'], msg: 'A traveller came to the town: <b>Orrin the Stargazer</b>, who maps the night sky from the shrine hill.' },
+  { era: 2, name: 'Tessaly', role: 'inventor', lines: ['IN1', 'IN2'], msg: '<b>Tessaly the Inventor</b> moved to the city. She says she can make light without fire.' },
+  { era: 3, name: 'Bram', role: 'architect', lines: ['AR1', 'AR2'], msg: '<b>Bram the Tower-Builder</b> arrived with a roll of plans. He wants to build higher than the giant.' },
+  { era: 4, name: 'Kesh', role: 'visionary', lines: ['VI1', 'VI2', 'VI3'], msg: '<b>Kesh the Rocket Maker</b> is here, promising everyone a ride to the red star.' },
+  { era: 5, name: 'Lio', role: 'astronaut', lines: ['AS1', 'AS2'], msg: '<b>Lio the Star Pilot</b> came to fly their first ship.' },
+];
+village.visitors = []; village.visitorsGone = [];
+function visitorsCheck(instant) {
+  for (const def of VISITORS) {
+    if (def.era > eraShown || village.visitors.includes(def.name) || village.visitorsGone.includes(def.name)) continue;
+    if (!instant && villageMoodAvg().trust < 45) continue;   // they only come on good days
+    const v = spawnVillager({ name: def.name, role: def.role, home: 'hall' }, 30 + VISITORS.indexOf(def));
+    v.visitor = def; v.fear = 5; v.trust = 60;
+    if (instant) { v.x = VC.x + rand(-15, 15); v.z = VC.z + rand(-15, 15); } else { v.x = PASS.x + rand(-6, 6); v.z = PASS.z - 60; v.target = { x: VC.x, z: VC.z }; v.state = 'arrive'; }
+    villagers.push(v); village.visitors.push(def.name);
+    if (!instant) { toast(`<span>${def.msg}</span>`); journalAll(`${def.name} the ${ROLE_TITLE[def.role]} came to live with us`); villageLog(`${def.name} the ${ROLE_TITLE[def.role]} arrived`); }
+  }
+}
+function visitorBrain(v, ph) {
+  if (v.role === 'stargazer' && ph === 'night') { v.state = 'work'; v.target = { x: SHRINE.x + 22, z: SHRINE.z + 22 }; v.activity = 'watching the stars from the shrine hill'; return true; }
+  if ((v.role === 'astronaut' || v.role === 'visionary') && rocket && ph !== 'night') { if (!v.target || hyp(v.target.x - rocket.spot.x, v.target.z - rocket.spot.z) > 30) v.target = { x: rocket.spot.x + rand(-18, 18), z: rocket.spot.z + 20 + rand(-4, 4) }; v.state = 'work'; v.activity = v.role === 'astronaut' ? 'getting ready to fly' : 'checking the rocket'; return true; }
+  if (ph === 'day') { v.taskT -= 0.5; if (v.taskT <= 0 || !v.target) { v.target = { x: VC.x + rand(-28, 28), z: VC.z + rand(-28, 28) }; v.taskT = rand(8, 14); v.activity = { stargazer: 'telling everyone about the stars', inventor: 'tinkering with something', architect: 'measuring the plaza', visionary: 'giving a speech about the stars', astronaut: 'training' }[v.role]; } v.state = 'work'; return true; }
+  return false;
+}
+
+/* =========================================================
+   PLAY AS A VILLAGER: you are Tam, the giant thinks for itself
+   ========================================================= */
+Object.assign(VM, { me: null, love: 40, rage: 5, carry: null, carryMesh: null, task: null, lastThrower: null, glare: null, smiteCd: 30, talkCd: new Map(), leaving: false, promiseT: 0, restT: 0, sayCd: 0, friendT: 0 });
+function vmSetup() {
+  const me = VM.me = byName('Tam'); me.player = true; me.fear = 10; me.trust = 40; me.activity = 'you';
+  for (const id of ROOT_IDS) { words[id].locked = true; scriptW[id].locked = true; } nameUnsealed = true; sealedSeen = true; updateCount();
+  $('#btn-aspect').hidden = true; $('#t-aspect').hidden = true; $('#t-dig').hidden = true; $('#t-raise').hidden = true;
+  $('#t-light').textContent = 'Run'; $('#t-smite').textContent = 'Throw'; $('#t-kneel').textContent = 'Praise'; $('#t-speak').textContent = 'Speak';
+  $('#hud-help').innerHTML = `<b>Walk</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp; <b>Run</b> <kbd>Shift</kbd> &nbsp; <b>Look</b> drag<br>
+    <b>Take bread, pick up a stone, give, hide</b> <kbd>F</kbd><br><b>Throw your stone at the giant</b> <kbd>Q</kbd><br>
+    <b>Praise the giant to a neighbour</b> <kbd>E</kbd> &nbsp; <b>Speak against it</b> <kbd>R</kbd><br>
+    <b>Speak to the giant</b> <kbd>T</kbd> &nbsp; At night, go to the hall to sway the council<br><kbd>H</kbd> hides this`;
+  $('#gmood').hidden = false;
+  camYaw = Math.atan2(me.x - giant.x, me.z - giant.z); camPitch = 0.3; camZoom = 1;
+  toast('<span>You are <b>Tam</b>, a farmer. The giant thinks the village loves it. Make that true, or drive it out.</span>');
+  vmGiantSays(['big', 'good'], 3);
+}
+const vmDist = (a, b) => hyp(a.x - b.x, a.z - b.z);
+function vmMove(v, dt) {
+  let ix = 0, iz = 0;
+  if (!paused && !ending) {
+    if (keys.KeyW || keys.ArrowUp) iz += 1; if (keys.KeyS || keys.ArrowDown) iz -= 1; if (keys.KeyA) ix -= 1; if (keys.KeyD) ix += 1;
+    if (stick.active) { ix += stick.x; iz -= stick.y; }
+  }
+  if (v.diveT > 0) { v.diveT -= dt; v.vx *= 1 - dt * 3; v.vz *= 1 - dt * 3; return; }
+  const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  let mx = fx * iz + rx * ix, mz = fz * iz + rz * ix; const ml = hyp(mx, mz);
+  const run = keys.ShiftLeft || keys.ShiftRight || giant.lightToggle, sp = (run ? 9 : 5) * Math.min(1, ml);
+  if (ml > 0.1) { mx /= ml; mz /= ml; v.vx = lerp(v.vx, mx * sp, dt * 8); v.vz = lerp(v.vz, mz * sp, dt * 8); }
+  else { v.vx *= 1 - dt * 8; v.vz *= 1 - dt * 8; }
+  if (VM.carryMesh) { v.mesh.arms[1].updateMatrixWorld(true); const p = new THREE.Vector3(0, -0.9, 0.25); v.mesh.arms[1].localToWorld(p); VM.carryMesh.position.copy(p); v.mesh.arms[1].rotation.x = -0.9; }
+  if (hyp(v.x - PASS.x, v.z - PASS.z) < 34 && !ending) showEnding('vm_left');
+}
+function vmCamera(dt) {
+  const me = VM.me, base = me.hidden ? me.homeHouse.door : me, y0 = height(base.x, base.z);
+  const dist = 15 * camZoom, cp = clamp(camPitch, -0.08, 1.15);
+  const cx = base.x + Math.sin(camYaw) * dist, cz = base.z + Math.cos(camYaw) * dist;
+  let cy = y0 + 3 + cp * 11; cy = Math.max(cy, height(cx, cz) + 1.5);
+  shake = Math.max(0, shake - dt * 2.8); const sh = shake * shake * 0.6;
+  camera.position.set(cx + rand(-sh, sh), cy + rand(-sh, sh), cz + rand(-sh, sh));
+  camera.lookAt(base.x - Math.sin(camYaw) * 20, y0 + 6 + (0.34 - cp) * 30, base.z - Math.cos(camYaw) * 20);
+}
+// ---------- the giant's own mind ----------
+const GIANT_REST = { x: -30, z: 165 }, GIANT_DUSK = { x: 12, z: 112 };
+const GIANT_POIS = [{ x: 120, z: 120 }, { x: 140, z: -60 }, { x: -120, z: 40 }, { x: -60, z: -110 }, { x: 60, z: -120 }, { x: -100, z: 140 }, { x: 60, z: 160 }];
+function vmMoodWord() { return VM.leaving ? 'Leaving' : VM.rage >= 75 ? 'Furious' : VM.rage >= 45 ? 'Angry' : VM.love >= 80 ? 'Adoring' : VM.love >= 55 ? 'Fond of you all' : VM.love >= 30 ? 'Content' : 'Lonely'; }
+function vmGiantSays(r, delay = 0) {
+  setTimeout(() => {
+    if (!VM.on || ending) return;
+    const el = document.createElement('div'); el.className = 'bubble giant-b';
+    el.innerHTML = `<span class="who">The giant</span>` + giantLineHTML(r);
+    $('#bubbles').appendChild(el); bubbles.push({ el, v: giantSpeaker, t: 5, line: { r }, giant: true });
+    sfxSpeak({ r }, { giant: true, dist: vmDist(giant, VM.me) });
+  }, delay * 1000);
+}
+function vmGiantAI(dt) {
+  const G = giant, me = VM.me, out = { x: 0, z: 0, light: false };
+  VM.rage = Math.max(0, VM.rage - dt * 0.7); VM.smiteCd -= dt; VM.restT -= dt; VM.promiseT -= dt;
+  const ph = phaseOf(tDay), near = hyp(G.x - VC.x, G.z - VC.z) < 120;
+  if (ph === 'dusk' && hyp(G.x - VC.x, G.z - VC.z) < 90 && villagers.filter(v => v.state === 'gather' && !v.hidden).length >= 3) VM.love = Math.min(100, VM.love + dt * 0.25);
+  let tgt = null, arrive = 10;
+  if (G.reach || G.throwA || G.squeeze || G.pourT > 0) return out;
+  if (VM.leaving) { tgt = PASS; arrive = 20; if (vmDist(G, PASS) < 26 && !ending) showEnding(VM.leaving === 'asked' ? 'vm_asked' : 'vm_drove'); }
+  else if (VM.glare) {
+    const g = VM.glare; g.t -= dt;
+    G.yaw = angLerp(G.yaw, Math.atan2(g.v.x - G.x, g.v.z - G.z), dt * 3); G.kneeling = false;
+    if (g.t <= 0) {
+      VM.glare = null; VM.smiteCd = 25;
+      const v = g.v;
+      if (!v.dead && !v.hidden && vmDist(v, G) < 170) {
+        if (giantKind === 'goddess') { lightning(v.x, v.z); killVillager(v, 'sky'); } else G.throwA = { t: 0, dur: 0.8, v, fired: false };
+        VM.rage = Math.max(0, VM.rage - 35);
+      } else if (v === me) toast('<span>You hid in time. The giant lost sight of you.</span>');
+    }
+    return out;
+  }
+  else if (VM.rage >= 45) {
+    const t = VM.lastThrower && !VM.lastThrower.dead && !VM.lastThrower.hidden ? VM.lastThrower : null;
+    tgt = t || VC; arrive = 30;
+    if (t && VM.rage >= 70 && VM.smiteCd <= 0 && vmDist(t, G) < 140) {
+      VM.glare = { v: t, t: 3.2 };
+      toast(t === me ? '<span><b>The giant is glaring at you.</b> Get inside a house, now!</span>' : `<span>The giant is glaring at <b>${t.name}</b>.</span>`);
+      vmGiantSays(['fight'], 0.2);
+    }
+  }
+  else if (ph === 'night') { tgt = GIANT_REST; arrive = 8; }
+  else if (ph === 'dusk') { tgt = GIANT_DUSK; arrive = 8; }
+  else {
+    if (!VM.task || VM.task.done) VM.task = vmNewTask();
+    const T = VM.task;
+    if (T.kind === 'water') {
+      if (!G.carry) { tgt = T.river; arrive = 13; if (vmDist(G, T.river) < 15) { G.yaw = Math.atan2(T.river.x - G.x, T.river.z - G.z); if (riverNear()) giantUse(); } }
+      else if (G.carry === 'water') { tgt = T.field; arrive = 9; if (inField(T.field, frontPoint(15).x, frontPoint(15).z, 2)) { giantUse(); T.done = true; vmGiantSays(['water', 'food', 'good'], 1.5); } }
+    } else if (T.kind === 'fruit') {
+      if (!G.carry) { if (!T.tree.fruit) { T.done = true; } else { tgt = T.tree; arrive = 11; if (vmDist(G, T.tree) < 13) { G.yaw = Math.atan2(T.tree.x - G.x, T.tree.z - G.z); if (treeNear()) giantUse(); } } }
+      else if (G.carry === 'fruit') { const d = vmDist(G, VC); tgt = VC; arrive = 36; if (d < 40) { G.yaw = Math.atan2(VC.x - G.x, VC.z - G.z); giantUse(); T.done = true; vmGiantSays(['food', 'child', 'good'], 1.4); } }
+    } else {
+      tgt = T.at; arrive = 10;
+      if (vmDist(G, T.at) < 12) { if (!T.restAt) { T.restAt = gameTime; G.kneeling = true; } if (gameTime - T.restAt > T.rest) { T.done = true; G.kneeling = false; } return out; }
+    }
+  }
+  if (G.carry === 'boulder') giantUse();
+  if (!tgt) return out;
+  const dx = tgt.x - G.x, dz = tgt.z - G.z, d = hyp(dx, dz);
+  if (d < arrive) { if (ph === 'night' || ph === 'dusk') { if (!G.kneeling) G.kneeling = true; if (ph === 'dusk') G.yaw = angLerp(G.yaw, Math.atan2(VC.x - G.x, VC.z - G.z), dt * 2); } return out; }
+  G.kneeling = false;
+  out.x = dx / d; out.z = dz / d;
+  out.light = near && (VM.love >= 35 || VM.promiseT > 0) && VM.rage < 45;
+  // walk around the huts when being careful
+  if (out.light) for (const h of houses) { if (h.crushed) continue; const hx = G.x + out.x * 12 - h.x, hz = G.z + out.z * 12 - h.z, hd = hyp(hx, hz); if (hd < h.r + 7) { out.x += hx / hd * 0.8; out.z += hz / hd * 0.8; const l = hyp(out.x, out.z); out.x /= l; out.z /= l; } }
+  return out;
+}
+function vmNewTask() {
+  const dry = FIELDS.filter(f => !f.irrigated && f.wet < 0.25 && season !== 'winter');
+  if (dry.length && VM.love >= 25 && Math.random() < 0.7) { const f = pick(dry); return { kind: 'water', field: f, river: { x: riverX(f.z), z: f.z } }; }
+  const trees = TREES.filter(t => t.fruit && hyp(t.x - VC.x, t.z - VC.z) < 160);
+  if (trees.length && VM.love >= 45 && Math.random() < 0.5) return { kind: 'fruit', tree: trees.sort((a, b) => vmDist(a, giant) - vmDist(b, giant))[0] };
+  return { kind: 'wander', at: pick(GIANT_POIS), rest: rand(12, 25) };
+}
+function vmGiantHit(by, fire) {
+  VM.rage = Math.min(100, VM.rage + (by === VM.me ? 9 : 6) + (fire ? 4 : 0)); VM.love = Math.max(0, VM.love - (by === VM.me ? 6 : 3));
+  if (by) VM.lastThrower = by;
+  if (by === VM.me) { for (const v of villagers) if (!v.player && vmDist(v, VM.me) < 60) addAnger(v, 4); journalNear(VM.me.x, VM.me.z, 120, 'Tam threw a stone at the giant'); }
+  if (Math.random() < 0.35 && VM.sayCd <= 0) { VM.sayCd = 6; vmGiantSays(VM.rage < 40 ? ['not', 'fight'] : VM.rage < 70 ? ['go', 'home'] : ['fight'], 0.3); }
+}
+function vmFootstep(fx, fz, light) {
+  const me = VM.me; if (me.hidden || ending) return;
+  const d = hyp(me.x - fx, me.z - fz);
+  if (d < 4.2) {
+    if (VM.rage >= 60 && !light) { me.mesh.g.visible = false; burst(me.x, height(me.x, me.z), me.z, 20, 'dust'); killVillager(me, 'boulder'); setTimeout(() => showEnding('vm_crushed'), 1200); return; }
+    vmDrop(); me.diveT = 0.7; const k = 1 / Math.max(d, 0.5); me.vx = (me.x - fx) * k * 12; me.vz = (me.z - fz) * k * 12;
+    toast('<span>Whoa! That foot nearly flattened you.</span>');
+  } else if (d < 14 && !light) shake = Math.min(1.4, shake + 0.4);
+}
+// ---------- what Tam can do ----------
+function vmNearest(r) { let best = null, bd = r; for (const v of villagers) { if (v.player || v.hidden || v.dead || v.riding) continue; const d = vmDist(v, VM.me); if (d < bd) { bd = d; best = v; } } return best; }
+function vmHold(kind) {
+  vmDrop(true); VM.carry = kind;
+  const m = kind === 'bread' ? new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 8), mat(0xd9a35a)) : new THREE.Mesh(new THREE.DodecahedronGeometry(0.32, 0), mat(0x8f8a80));
+  if (kind === 'bread') m.scale.set(1.3, 0.7, 0.9);
+  m.castShadow = true; scene.add(m); VM.carryMesh = m;
+}
+function vmDrop(silent) { if (VM.carryMesh) scene.remove(VM.carryMesh); VM.carryMesh = null; VM.carry = null; }
+function vmHint() {
+  const me = VM.me; if (!me || ending) return '';
+  if (me.hidden) return '<kbd>F</kbd> Step back outside';
+  const door = me.homeHouse.door;
+  if (!me.homeHouse.crushed && vmDist(me, door) < 4.5) return '<kbd>F</kbd> Hide inside your home';
+  if (VM.carry === 'bread') { if (vmDist(me, giant) < 32) return '<kbd>F</kbd> Offer the bread to the giant'; if (vmDist(me, OFFER) < 8) return '<kbd>F</kbd> Leave the bread at the offering stone'; return '<kbd>F</kbd> Put the bread down'; }
+  if (VM.carry === 'stone') return vmDist(me, giant) < 75 ? '<kbd>Q</kbd> Throw it at the giant &nbsp; <kbd>F</kbd> Drop it' : '<kbd>F</kbd> Drop the stone';
+  if (!me.homeHouse.crushed && vmDist(me, door) < 4.5) return '<kbd>F</kbd> Hide inside your home';
+  if (vmDist(me, OVEN) < 6) return '<kbd>F</kbd> Take bread from the oven';
+  const v = vmNearest(7); if (v) return `<kbd>E</kbd> Praise the giant to ${v.name} &nbsp; <kbd>R</kbd> Speak against it`;
+  return '<kbd>F</kbd> Pick up a stone';
+}
+function vmUse() {
+  const me = VM.me; if (!me || paused || ending) return;
+  if (me.hidden) { unhide(me); me.x = me.homeHouse.door.x; me.z = me.homeHouse.door.z; return; }
+  if (!me.homeHouse.crushed && vmDist(me, me.homeHouse.door) < 4.5) { vmDrop(); hide(me); toast('<span>You slipped inside. The giant can\u2019t see you in here.</span>'); return; }
+  if (VM.carry === 'bread') {
+    if (vmDist(me, giant) < 32) {
+      vmDrop(); VM.love = Math.min(100, VM.love + 10); VM.rage = Math.max(0, VM.rage - 15); giftsReceived++;
+      const g = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 8), mat(0xd9a35a)); g.scale.set(1.3, 0.7, 0.9); g.position.set(me.x, height(me.x, me.z) + 0.3, me.z); scene.add(g); setTimeout(() => scene.remove(g), 40000);
+      giant.kneeling = true; vmGiantSays(VM.love > 70 ? ['food', 'good', 'not', 'afraid'] : ['food', 'good'], 1);
+      say(me, LINES.P3, false, false); journalNear(me.x, me.z, 120, 'Tam fed the giant bread with their own hands');
+      for (const v of villagers) if (!v.player && vmDist(v, me) < 70) { v.fear = Math.max(0, v.fear - 12); v.trust = Math.min(100, v.trust + 4); }
+      return;
+    }
+    if (vmDist(me, OFFER) < 8) { vmDrop(); basket.visible = true; VM.love = Math.min(100, VM.love + 5); toast('<span>You left bread at the offering stone.</span>'); return; }
+    vmDrop(); return;
+  }
+  if (VM.carry === 'stone') { vmDrop(); return; }
+  if (!me.homeHouse.crushed && vmDist(me, me.homeHouse.door) < 4.5) { hide(me); toast('<span>You slipped inside. The giant can’t see you in here.</span>'); return; }
+  if (vmDist(me, OVEN) < 6) { vmHold('bread'); return; }
+  vmHold('stone');
+}
+function vmThrow() {
+  const me = VM.me; if (!me || paused || ending || me.hidden) return;
+  if (VM.carry !== 'stone') { toast('<span>Pick up a stone first (<kbd style="color:var(--ink);border-color:var(--ink)">F</kbd>).</span>'); return; }
+  if (vmDist(me, giant) > 75) { toast('<span>Too far away to throw.</span>'); return; }
+  vmDrop(); throwAt(me, false); me.yaw = Math.atan2(giant.x - me.x, giant.z - me.z);
+  for (const v of villagers) if (!v.player && vmDist(v, me) < 40 && v.anger > 30 && !v.hidden && Math.random() < 0.5) setTimeout(() => { if (!v.dead && !v.hidden) throwAt(v, false); }, rand(400, 1400));
+}
+function vmTalk(dir) {
+  const me = VM.me; if (!me || paused || ending || me.hidden) return;
+  const v = vmNearest(7); if (!v) { toast('<span>Walk up to a neighbour first.</span>'); return; }
+  if ((VM.talkCd.get(v) || -99) > gameTime) { toast(`<span>${v.name} needs a minute to think about it.</span>`); return; }
+  VM.talkCd.set(v, gameTime + 15); v.yaw = Math.atan2(me.x - v.x, me.z - v.z);
+  if (dir > 0) {
+    say(me, LINES.G1, false, false);
+    v.trust = Math.min(100, v.trust + 12); v.fear = Math.max(0, v.fear - 10); addAnger(v, -10); journal(v, 'Tam told me the giant is good');
+    setTimeout(() => { if (!v.dead) say(v, v.trust > 45 ? pick([LINES.S1, LINES.P1, LINES.G1]) : pick([LINES.Q2, LINES.Q4, LINES.R9]), false, false); }, 1600);
+  } else {
+    say(me, LINES.R6, false, false);
+    addAnger(v, 15); v.trust = Math.max(0, v.trust - 10); journal(v, 'Tam told me we should fight the giant');
+    setTimeout(() => { if (!v.dead) say(v, (v.anger || 0) > 35 ? pick([LINES.R2, LINES.R3, LINES.R6]) : pick([LINES.R9, LINES.Q17]), false, false); }, 1600);
+  }
+}
+function vmSpeakToGiant(r) {
+  const me = VM.me; const S = new Set(r), has = id => S.has(id);
+  const line = { id: 'T' + gameTime.toFixed(0), r, en: r.map(id => id === 'name' ? 'great one' : ROOTS[id].en).join(' ') + '.' };
+  say(me, line, false, false);
+  if (vmDist(me, giant) > 110) { toast('<span>The giant is too far away to hear you.</span>'); return; }
+  let rep = ['big', 'good'];
+  if (has('please') && has('go') && !has('not')) {
+    const avgT = villageMoodAvg().trust;
+    if (VM.love < 35 || VM.rage > 35 || avgT < 30) { rep = ['please', 'not']; setTimeout(() => { if (!ending) { VM.leaving = 'asked'; vmGiantSays(['go', 'home'], 0); toast('<span>The giant turned toward the pass.</span>'); } }, 3500); }
+    else { rep = ['not', 'go']; VM.love = Math.max(0, VM.love - 6); }
+  } else if (has('not') && (has('step') || has('afraid'))) { VM.love = Math.min(100, VM.love + 8); VM.rage = Math.max(0, VM.rage - 15); VM.promiseT = 240; rep = has('step') ? ['not', 'step'] : ['not', 'afraid']; }
+  else if (has('not') && has('fight')) { VM.rage = Math.max(0, VM.rage - 25); rep = ['not', 'fight', 'good']; }
+  else if (has('fight')) { VM.rage = Math.min(100, VM.rage + 20); VM.lastThrower = me; rep = ['fight']; }
+  else if (has('food') && has('please')) { VM.task = { kind: 'fruit', tree: (TREES.filter(t => t.fruit).sort((a, b) => vmDist(a, giant) - vmDist(b, giant))[0]) }; if (!VM.task.tree) VM.task = null; rep = ['food', 'good']; }
+  else if (has('water')) { const f = FIELDS.find(f => !f.irrigated); if (f) VM.task = { kind: 'water', field: f, river: { x: riverX(f.z), z: f.z } }; rep = ['water', 'good']; }
+  else if (has('sing')) { VM.love = Math.min(100, VM.love + 4); rep = ['sing', 'good']; }
+  else if (has('name')) { rep = ['name', 'good', 'big']; }
+  else if (has('good')) { VM.love = Math.min(100, VM.love + 4); rep = ['good', 'good']; }
+  vmGiantSays(rep, 1.4);
+}
+// ---------- the council at night ----------
+function vmAtHall() { const me = VM.me; return me && !me.dead && vmDist(me, HALL) < 40; }
+function vmCouncilChoice(plans) {
+  const leaders = villagers.filter(v => !v.player && !v.dead && isAdult(v));
+  const by = f => leaders.slice().sort((a, b) => f(b) - f(a));
+  const kind = by(v => v.trust), angry = by(v => v.anger || 0), scared = by(v => v.fear);
+  const need = currentNeeds()[0] || 'water';
+  const opts = [
+    { type: 'festival', leader: (OSWEN.dead ? kind[0] : OSWEN).name, members: kind.slice(0, 5).map(v => v.name), goal: 'Sing and dance for it.', label: 'Hold a festival for the giant' },
+    { type: 'petition', request: need, leader: kind[0].name, members: kind.slice(0, 2).map(v => v.name), goal: `Ask it for ${REQUESTS[need]}.`, label: `Ask the giant for ${REQUESTS[need]}` },
+    { type: 'ambush', place: favouritePlace(), leader: angry[0].name, members: angry.slice(0, 4).map(v => v.name), goal: 'Stones and ropes until it leaves.', label: `Ambush it at ${PLACES[favouritePlace()].label}` },
+    { type: 'hide_children', leader: scared[0].name, members: scared.slice(0, 2).map(v => v.name), goal: 'Keep the little ones safe.', label: 'Hide the children from it' },
+  ];
+  paused = true;
+  const box = $('#vm-council'); box.hidden = false;
+  $('#vm-council-opts').innerHTML = opts.map((o, i) => `<button type="button" data-i="${i}">${o.label}</button>`).join('') + `<button type="button" data-i="-1" class="quiet">Stay quiet and let them decide</button>`;
+  $('#vm-council-opts').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    const i = +b.dataset.i; box.hidden = true; paused = false;
+    if (i >= 0) {
+      const o = opts[i];
+      const p = Object.assign({ id: ++planSeq, day: dayNum, state: 'planned', heard: false, understood: false, line: null, mind: 'you', place: o.place || favouritePlace(), request: o.request || need }, o);
+      p.line = PLAN_LINE[p.type](p);
+      plans.splice(0, plans.length, p);
+      village.plans = village.plans.filter(q => q.state === 'active').concat(plans);
+      if (village.meeting) village.meeting.plans = plans;
+      toast(`<span>The council agreed with you: <b>${o.label.toLowerCase()}</b>.</span>`);
+    }
+  }));
+}
+function vmUpdate(dt) {
+  if (!VM.on || !VM.me) return;
+  VM.sayCd -= dt;
+  const el = $('#gmood-text'); const w = vmMoodWord(); if (el.textContent !== w) el.textContent = w;
+  $('#gmood').className = 'chip mood ' + (VM.rage >= 45 || VM.leaving ? 'm3' : VM.love >= 55 ? 'm0' : 'm1');
+  if (VM.glare && VM.glare.v === VM.me && VM.me.hidden) { VM.glare.t = Math.min(VM.glare.t, 0.2); }
+  // friends: at dusk, a loved giant and a trusting village
+  if (!ending && phaseOf(tDay) === 'dusk' && dayNum >= 3 && VM.love >= 85 && villageMoodAvg().trust >= 50 && vmDist(VM.me, giant) < 60 && !VM.me.hidden) {
+    VM.friendT += dt; if (VM.friendT > 4) { vmGiantSays(['child', 'not', 'afraid'], 0); setTimeout(() => showEnding('vm_friend'), 3500); VM.friendT = -999; }
+  }
+}
 
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
 window.addEventListener('pagehide', () => saveGame(true));
@@ -5152,12 +5516,14 @@ function updateGiant(dt) {
   if (keys.ArrowRight) camYaw -= dt * 1.6;
   if (stick.active) { ix += stick.x; iz -= stick.y; }
   if (ending && ending.kind !== 'leave') { ix = 0; iz = 0; }
+  if (VM.on) { ix = 0; iz = 0; }
   if (aspect === 'moss') { if (ix || iz) think('moss-stuck', 'I cannot move. The moss holds me. I could shake it off, if I wanted to.'); ix = 0; iz = 0; }
   G.light = !!(keys.ShiftLeft || keys.ShiftRight || G.lightToggle);
-  const il = Math.min(1, hyp(ix, iz));
-  if (il > 0.15 && G.kneeling && G.kneel > 0.6) toggleKneel();
+  let il = Math.min(1, hyp(ix, iz));
+  if (il > 0.15 && G.kneeling && G.kneel > 0.6 && !VM.on) toggleKneel();
   const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
   let mx = fx * iz + rx * ix, mz = fz * iz + rz * ix;
+  if (VM.on && !ending) { const a = vmGiantAI(dt); mx = a.x; mz = a.z; G.light = a.light; il = hyp(a.x, a.z) > 0.1 ? 1 : 0; }
   const ml = hyp(mx, mz);
   const moving = ml > 0.15 && !G.kneeling;
   const targetSpeed = moving ? (G.light ? 5 : 10.5) * Math.min(1, il) * (G.carry ? 0.8 : 1) * (G.roped > 0 ? 0.3 : 1) * (G.reach || G.throwA || G.squeeze ? 0.25 : 1) : 0;
@@ -5279,6 +5645,7 @@ function updateGiant(dt) {
 }
 function updateCamera(dt) {
   const G = giant, k = G.kneel;
+  if (VM.on && VM.me && !(ending && ending.done)) { vmCamera(dt); return; }
   if (ending && ending.kind === 'stay' && ending.epi) {
     const E = ending.epi, f = giantForward(), gy = height(G.x, G.z), sway = Math.sin(E.t * 0.06) * 0.5;
     const back = 95 + Math.min(E.t, 36) * 1.6, up = 60 + Math.min(E.t, 36) * 2.2;
@@ -5362,7 +5729,7 @@ function updateWorld(dt) {
   }
   // listening chip
   const ls = $('#listen');
-  if (giant.kneeling && !ending) { ls.hidden = false; ls.textContent = stilled() ? 'Listening. They forget you are here.' : 'Kneeling. Stay still…'; }
+  if (giant.kneeling && !ending && !VM.on) { ls.hidden = false; ls.textContent = stilled() ? 'Listening. They forget you are here.' : 'Kneeling. Stay still…'; }
   else ls.hidden = true;
   // clock
   $('#clock-text').textContent = `Day ${dayNum} · ${phaseLabel(tDay)}`;
@@ -5468,7 +5835,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // test hook (used only by automated checks)
-window.__gg = { get ending() { return ending; }, applyEra, techDawn, launchShip, get era() { return eraShown; }, startNextBuilding, finishBuilding, helpBuild, stompSite, BUILDS, giant, villagers, words, houses, heardLog, LINES, start: begin, footstep, get tDay() { return tDay; }, set tDay(v) { tDay = v; }, get gameTime() { return gameTime; }, lockedCount, keys, useAction, village, rulesCouncil, requestCouncil, startCouncil, cleanPlans, councilPayload, startPlan, giantAsksPeace, saveGame, snapshot, get season() { return season; }, get weather() { return weather; }, setSeason, rollWeather, recordEnding, renderTitle, applyEdit, shape, boulders, liftBoulder, dropBoulder, helpRebuild, editAt, earnAspect, setAspect, get aspect() { return aspect; }, graves, get pim() { return { pimBond, pimStage, pimPath }; }, set pimBondV(v) { pimBond = v; }, pimDawn, set dayN(v) { dayNum = v; }, get dayN() { return dayNum; }, piles, FIELDS, TREES, smite, killVillager, openSpeak, interpret, startReveal, startLeave, startStay, readTablet, scriptW, get state() { return { revoltStage, tyrant, pain, smiteCount, scriptActive, nameUnsealed, tablet: !!tablet, ending, unrest: unrest(), giftsReceived, homesLost }; }, setTalk(r) { sentence = r; }, doSpeak, findTarget, unrest, cam(y, p, z) { camYaw = y; camPitch = p; camZoom = z; },
+window.__gg = { VM, get eraShown() { return eraShown; }, visitorsCheck, get ending() { return ending; }, applyEra, techDawn, launchShip, get era() { return eraShown; }, startNextBuilding, finishBuilding, helpBuild, stompSite, BUILDS, giant, villagers, words, houses, heardLog, LINES, start: begin, footstep, get tDay() { return tDay; }, set tDay(v) { tDay = v; }, get gameTime() { return gameTime; }, lockedCount, keys, useAction, village, rulesCouncil, requestCouncil, startCouncil, cleanPlans, councilPayload, startPlan, giantAsksPeace, saveGame, snapshot, get season() { return season; }, get weather() { return weather; }, setSeason, rollWeather, recordEnding, renderTitle, applyEdit, shape, boulders, liftBoulder, dropBoulder, helpRebuild, editAt, earnAspect, setAspect, get aspect() { return aspect; }, graves, get pim() { return { pimBond, pimStage, pimPath }; }, set pimBondV(v) { pimBond = v; }, pimDawn, set dayN(v) { dayNum = v; }, get dayN() { return dayNum; }, piles, FIELDS, TREES, smite, killVillager, openSpeak, interpret, startReveal, startLeave, startStay, readTablet, scriptW, get state() { return { revoltStage, tyrant, pain, smiteCount, scriptActive, nameUnsealed, tablet: !!tablet, ending, unrest: unrest(), giftsReceived, homesLost }; }, setTalk(r) { sentence = r; }, doSpeak, findTarget, unrest, cam(y, p, z) { camYaw = y; camPitch = p; camZoom = z; },
   sim(sec) { for (let t = 0; t < sec; t += 0.05) { updateGiant(0.05); updateWorld(0.05); updateMono(0.05); updateBubbles(0.05); } } };
 })();
 </script>
