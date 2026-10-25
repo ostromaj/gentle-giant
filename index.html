@@ -208,6 +208,8 @@ kbd { font-family: var(--font-body); font-size: 11px; font-weight: 800; border: 
 }
 body.touch #monologue { bottom: calc(200px + env(safe-area-inset-bottom, 0px)); }
 body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { display: none !important; }
+#epi-cap { position: fixed; left: 50%; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(720px, calc(100% - 32px)); text-align: center; z-index: 17; font-family: var(--font-display); font-size: clamp(20px, 3vw, 30px); color: var(--bone); text-shadow: 0 2px 18px rgba(20,16,30,.9); opacity: 0; transition: opacity 1.2s; pointer-events: none; text-wrap: balance; }
+#epi-cap.on { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 
@@ -241,6 +243,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 </div>
 <div class="hud" id="monologue" aria-live="polite"></div>
 <div class="hud" id="toast" role="status"></div>
+<div id="epi-cap" aria-live="polite"></div>
 
 <div id="touch" hidden>
   <div id="stick"><div id="knob"></div></div>
@@ -259,7 +262,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 
 <section id="start" aria-labelledby="title">
   <div class="start-inner">
-    <div class="build">Playable build 0.11</div>
+    <div class="build">Playable build 0.12</div>
     <h1 id="title">Gentle Giant</h1>
     <p class="tag">They sing for you every night. Learn what they're singing.</p>
     <button class="continue" type="button" id="continue" hidden><b>Continue</b><span id="continue-sub"></span></button>
@@ -320,7 +323,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
     <div class="rev-final" id="rev-final"></div>
     <div class="rev-choice" id="rev-choice">
       <button type="button" id="choose-leave"><b>Leave</b><span>Cross the sleeping valley in the dark and climb out through the northern pass without waking anyone.</span></button>
-      <button type="button" id="choose-stay"><b>Stay</b><span>Lie down at the edge of the valley, become still as a hill, and speak one true sentence to them.</span></button>
+      <button type="button" id="choose-stay"><b>Stay</b><span>Kneel at the edge of their village, turn to stone, and speak one true sentence to them.</span></button>
     </div>
   </div>
 </section>
@@ -2105,10 +2108,11 @@ function chooseLine(v, watched) {
   const recentSmite = v.memory.some(m => m.type === 'smite' && gameTime - m.t < 120);
   const recentFire = v.memory.some(m => m.type === 'fire' && gameTime - m.t < 120);
   const ang = v.anger || 0;
-  if (v.state === 'mourn' && funeral) { if (watched) { push('M2', 4); } else { push('M1', 3); push('M3', 2); } return LINES[pick(pool)]; }
-  if (v.role === 'keeper') { if (watched) { push('S1', 2); if (revoltStage >= 1) push('R9', 3); push('C5', 1); } else push('G1', 3); return LINES[pick(pool)]; }
-  if (v.role === 'rebel') { if (watched) { push('D2', 2); push('R6', 2); push('R3', 1); } else { push('M5', 2); push('R2', 3); } return LINES[pick(pool)]; }
-  if (v.state === 'devotee') { push(watched ? 'S1' : 'G1', 1); return LINES[pick(pool)]; }
+  if (v.state === 'mourn' && funeral) { if (watched) { push('M2', 4); } else { push('M1', 3); push('M3', 2); } return LINES[pick(pool.length ? pool : ["P7"])]; }
+  if (v.role === 'wanderer') { push('P6', 2); push('S1', 1); push('G1', 1); return LINES[pick(pool)]; }
+  if (v.role === 'keeper') { if (watched) { push('S1', 2); if (revoltStage >= 1) push('R9', 3); push('C5', 1); } else push('G1', 3); return LINES[pick(pool.length ? pool : ["P7"])]; }
+  if (v.role === 'rebel') { if (watched) { push('D2', 2); push('R6', 2); push('R3', 1); } else { push('M5', 2); push('R2', 3); } return LINES[pick(pool.length ? pool : ["P7"])]; }
+  if (v.state === 'devotee') { push(watched ? 'S1' : 'G1', 1); return LINES[pick(pool.length ? pool : ["P7"])]; }
   if (v.role === 'child') {
     if (recentSmite) push('Q4', 3);
     if (v.trust > 60 && f < 20) push('C5', 3);
@@ -2120,8 +2124,8 @@ function chooseLine(v, watched) {
     if (f > 40) push(watched ? 'P7' : 'Q4', 2);
     if (ph === 'dusk') push('P4');
   } else if (watched) {
-    if (tyrant) { push('R8', 4); push('R7', 2); push('P7', 1); return LINES[pick(pool)]; }
-    if (revoltStage >= 3 && ang > f * 0.7) { push('R3', 3); push('R11', 3); push('R6', 2); return LINES[pick(pool)]; }
+    if (tyrant) { push('R8', 4); push('R7', 2); push('P7', 1); return LINES[pick(pool.length ? pool : ["P7"])]; }
+    if (revoltStage >= 3 && ang > f * 0.7) { push('R3', 3); push('R11', 3); push('R6', 2); return LINES[pick(pool.length ? pool : ["P7"])]; }
     if (recentSmite && f > 50) push('R7', 3);
     if (revoltStage >= 2 && ang > 45) push('D2', 3);
     if (justFed || (recentGift && f < 45)) push('P12', 3);
@@ -2367,7 +2371,8 @@ function updateVillager(v, dt) {
     const hr = hearRange();
     if (d < hr && bubbles.length < 4 && !bubbles.some(b => b.v === v)) {
       const watched = isWatched(v, d);
-      const line = (v === PIM && !said.has('pimFirst')) ? LINES.C1 : chooseLine(v, watched);
+      let line = (v === PIM && !said.has('pimFirst')) ? LINES.C1 : chooseLine(v, watched);
+      if (!line) { if (TEST) console.warn('noline', v.name, v.role, v.state, revoltStage, phaseOf(tDay)); line = LINES.P7; }
       if (v === PIM) said.add('pimFirst');
       const whisper = !watched && line.k !== 'honest' && line.k !== 'pub';
       say(v, line, whisper);
@@ -2394,6 +2399,7 @@ function houseEvent(h, kind) {
       addAnger(v, v.homeHouse === h ? 30 : d < 150 ? 16 : 6);
       if (v.homeHouse === h) v.fear = 100;
     }
+    if (eraShown > 0) showHouseEra(h);
     think('crush', 'Something broke. They will build it again. They always do.');
     journalAll(`the giant destroyed ${h.name || 'a home'}`);
   }
@@ -2404,6 +2410,7 @@ function restoreHouse(h) {
   h.roof.position.y = h.roofBase; h.roof.rotation.set(0, 0, 0);
   h.roofMat.color.setHex(pick(thatchCols)); h.wallsMat.color.setHex(pick(clayCols)); h.baseWall.copy(h.wallsMat.color);
   burst(h.x, height(h.x, h.z) + 1, h.z, 16, 'dust');
+  if (eraShown > 0) showHouseEra(h);
   if (DOV) DOV.rebuilding = null;
 }
 
@@ -3258,37 +3265,70 @@ function leaveStep(fx, fz) {
   }
   for (const h of houses) if (!h.crushed && hyp(h.x - fx, h.z - fz) < 18 && !e.woken.has(h)) { e.woken.add(h); e.harm++; }
 }
+const STATUE_SPOT = { x: -30, z: 150 };
 function startStay() {
   stowBoulder();
   $('#reveal').hidden = true; hideHud(false); paused = false;
   ending = { kind: 'stay', t: 0 };
   if (giant.held) putDown();
   cutRopes(false);
-  giant.kneeling = true; giant.carry = null;
-  think('stay1', 'I will lie down here, and I will never take another step.', true);
+  giant.x = STATUE_SPOT.x; giant.z = STATUE_SPOT.z; giant.yaw = Math.atan2(VC.x - giant.x, VC.z - giant.z); giant.speed = 0;
+  giant.kneeling = true; giant.carry = null; giant.reach = giant.throwA = giant.squeeze = null;
+  think('stay1', 'I will kneel here at the edge of their village, and I will never take another step.', true);
 }
+const STONE = new THREE.Color(0x9c978c);
 function updateStay(dt) {
   const e = ending; e.t += dt;
-  const M = giant.model, k = clamp((e.t - 2) / 4, 0, 1);
-  M.root.rotation.x = -k * Math.PI / 2 * 0.9;
-  M.root.position.y = height(giant.x, giant.z) + 0.35 + k * 3;
-  if (!e.mats && k > 0) { e.mats = []; M.root.traverse(o => { if (o.isMesh && o.material && o.material.color && !e.mats.includes(o.material)) e.mats.push(o.material); }); e.base = e.mats.map(m => m.color.clone()); }
-  if (e.mats) { const mk = clamp((e.t - 4) / 8, 0, 0.55); e.mats.forEach((m, i) => m.color.copy(e.base[i]).lerp(cA.setHex(0x6d8a4a), mk)); }
-  if (e.t > 9 && !e.asked) { e.asked = true; openSpeak('final'); }
+  const M = giant.model;
+  // turning to stone, from the feet up in spirit, all at once in fact
+  const k = clamp((e.t - 2.5) / 5, 0, 1);
+  if (!e.mats && k > 0) { e.mats = []; M.root.traverse(o => { if (o.isMesh && o.material && o.material.color && !e.mats.includes(o.material)) e.mats.push(o.material); }); e.base = e.mats.map(m => ({ c: m.color.clone(), e: m.emissive ? m.emissive.clone() : null })); }
+  if (e.mats) e.mats.forEach((m, i) => {
+    m.color.copy(e.base[i].c).lerp(STONE, k);
+    if (m.emissive) m.emissive.copy(e.base[i].e).multiplyScalar(1 - k);
+    if (m.roughness !== undefined) m.roughness = lerp(m.roughness, 1, k * 0.2);
+    if (m.metalness !== undefined) m.metalness *= 1 - k * 0.2;
+    if (k >= 1 && m.vertexColors && !m.userData.stoned) { m.userData.stoned = true; m.vertexColors = false; m.needsUpdate = true; }
+  });
+  if (k > 0.05 && k < 1 && Math.random() < dt * 8) { const p = new THREE.Vector3(); M.root.getWorldPosition(p); burst(p.x + rand(-8, 8), p.y + rand(2, 30), p.z + rand(-8, 8), 2, 'dust'); }
+  if (k >= 1 && !giant.frozen) { giant.frozen = true; for (const l of M.lids) l.scale.y = 0.95; think('stone', 'I cannot move now. I do not want to.', true); }
+  if (e.t > 8.5 && !e.asked) { e.asked = true; openSpeak('final'); }
+  if (e.epi) updateEpilogue(dt);
 }
+// after the last sentence: the years go by around the statue
+function updateEpilogue(dt) {
+  const E = ending.epi; E.t += dt;
+  const cap = (at, text) => { if (E.t >= at && !E.said.has(at)) { E.said.add(at); epiCaption(text); } };
+  if (E.ok) {
+    E.stepT -= dt;
+    if (E.stepT <= 0 && village.tech < 15) { E.stepT = 2.1; village.tech++; applyEra(false); }
+    if (eraShown >= 5 && rocket && rocket.ship && !rocket.flying && E.t > 27) launchShip();
+    for (const v of villagers) if (!v.dead) { v.fear = Math.max(0, v.fear - dt * 20); v.trust = Math.min(100, v.trust + dt * 10); }
+    cap(0.5, 'A season passed. The first child climbed your shoulder.'); cap(7, 'Their village became a town.'); cap(13, 'The town became a city.');
+    cap(19, 'Their towers grew taller than you.'); cap(25, 'And then they reached for the sky.');
+    if (E.t > 36 && !E.end) { E.end = true; epiCaption(''); showEnding('accepted'); }
+  } else {
+    for (const h of houses) if (!h.crushed && Math.random() < dt * 0.5) { h.crushed = true; h.walls.scale.y = 0.28; h.walls.position.y = 0.5 * h.s; h.roof.position.y = 1.4 * h.s; h.roof.rotation.z = 0.55; if (eraShown > 0) showHouseEra(h); }
+    for (const v of villagers) if (!v.hidden && Math.random() < dt * 0.4) { v.hidden = true; v.mesh.g.visible = false; }
+    if (ending.mats) ending.mats.forEach(m => m.color.lerp(cA.setHex(0x6d8a4a), dt * 0.08));
+    cap(0.5, 'They left in the spring.'); cap(6, 'Grass grows over you now.');
+    if (E.t > 12 && !E.end) { E.end = true; epiCaption(''); showEnding('feared'); }
+  }
+}
+function epiCaption(text) { const el = $('#epi-cap'); el.textContent = text; el.classList.toggle('on', !!text); }
 function finishStay(r) {
   const S = new Set(r), has = id => S.has(id);
   const good = (has('not') && (has('step') || has('fight') || has('afraid'))) || (has('please') && has('not'));
   const bad = (has('fight') && !has('not')) || (has('go') && !has('not')) || has('hide') || (has('food') && has('please'));
   const ad = villagers.filter(isAdult);
   const ok = good && !bad && avg(ad, v => v.trust) + (pimPath === 'keeper' && !PIM.dead ? 12 : 0) - (pimPath === 'rebel' ? 12 : 0) >= 26 && avg(ad, v => v.anger) < 45 && smiteCount < 3;
-  setTimeout(() => showEnding(ok ? 'accepted' : 'feared'), 3200);
+  setTimeout(() => { if (ending && ending.kind === 'stay') { ending.epi = { t: 0, ok, stepT: 1.5, said: new Set() }; hideHud(true); weather = { kind: 'clear', amt: weather.amt, target: 0, until: gameTime + 1e6 }; } }, 2600);
 }
 const ENDINGS = {
   clean: { label: 'Ending · Leave', title: 'It listened.', body: 'You crossed the valley in the dark without waking a single home. At dawn they found your footprints climbing toward the pass, already filling with rain. The Elder carved a small figure of you on the shrine stone, and under it a new word that means: it listened.' },
   storm: { label: 'Ending · Leave', title: 'They remember a storm.', body: 'You left, but not gently. Homes woke to the ground shaking and the sound of something enormous passing in the dark. Their songs still warn children about the walking mountain that came in the night, and might come back.' },
-  accepted: { label: 'Ending · Stay', title: 'The one who stayed still.', body: 'You lay down at the edge of the valley and spoke to them in their own words. It took a season before the first child climbed your shoulder. It took years before they planted terraces on you. Their new name for you means the one who stayed still.' },
-  feared: { label: 'Ending · Stay', title: 'A hill beside an empty valley.', body: 'You lay down and spoke, but they had already heard too much from you. By spring they followed the Skeptic over the pass and did not look back. Grass grows over you now. Nobody sings.' },
+  accepted: { label: 'Ending · Stay', title: 'The one who stayed still.', body: 'You knelt at the edge of their village, spoke to them in their own words, and turned to stone. A child climbed your shoulder that first spring. Their village grew into a city at your feet, and when their first ship rose toward the stars, it carried your name on its side. Their new name for you means the one who stayed still.' },
+  feared: { label: 'Ending · Stay', title: 'A statue beside an empty valley.', body: 'You knelt, spoke, and turned to stone, but they had already heard too much from you. By spring they followed the Skeptic over the pass and did not look back. Grass grows over you now. Nobody sings.' },
   castout: { label: 'Ending · Revolt', title: 'Driven out.', body: 'Stone by stone and rope by rope, they did what you thought was impossible. You limp out through the pass with their stones still rattling off your back. Behind you, for the first time, they are singing for themselves.' },
   tyrant: { label: 'Ending · Revolt', title: 'They kneel.', body: 'The last of them dropped to their knees. The songs will be louder now, and the offerings bigger, and every word of it will be a lie. You wanted to be loved. This is what you got instead.', keep: true },
   empty: { label: 'Ending', title: 'The valley is quiet.', body: 'There is no one left to sing to you, or to lie to you, or to beg you to go.' },
@@ -3310,7 +3350,7 @@ function updateStory(dt) {
   updateSwarm(dt); updateHail(dt); updateShaping(dt); updateSeasons(dt); updateAspects(dt); updateGrief(dt); updatePimBond(dt); updateKeeper(dt);
   checkStory();
   processReplies();
-  updateHeld(); updatePim(dt); updateRocks(dt); updateGrowth(dt);
+  updateHeld(); updatePim(dt); updateRocks(dt); updateGrowth(dt); updateAges(dt);
   updateGifts(dt);
   updateRevolt(dt);
   updateFires(dt);
@@ -3857,7 +3897,7 @@ function setSeason(next, instant) {
   if (next === season && !instant) return;
   seasonPrev = instant ? next : season; season = next; seasonBlend = instant ? 1 : 0;
   applySeasonLook(seasonBlend);
-  $('#season-text').textContent = SEASON_NAME[season];
+  $('#season-text').textContent = SEASON_NAME[season] + (eraShown ? ' · ' + ERA_NAME[eraShown] : '');
   if (!instant) {
     toast(`<span><b>${SEASON_NAME[season]}</b> comes to the valley. ${{ summer: 'Long warm days. The fields grow fast.', autumn: 'Harvest time. They need their fields whole.', winter: 'Snow. Nothing grows, and food runs short.', spring: 'Blossom and new shoots. Everything starts again.' }[season]}</span>`);
     think('season-' + season + dayNum, { summer: 'Summer again. The valley is green and loud with them.', autumn: 'The leaves are turning. They are cutting the wheat.', winter: 'Snow. They will be hungry this winter.', spring: 'Spring. The trees are blooming pink. I had forgotten they did that.' }[season]);
@@ -3982,7 +4022,7 @@ function snapshot() {
     v: 1, kind: giantKind, day: dayNum, t: tDay, gameTime, season,
     words: W(words), script: W(scriptW), sealedSeen, scriptActive, tablet: !!tablet, nameUnsealed,
     dead: fallen.map(v => v.name), gone: (PIM.gone ? ['Pim'] : []).concat(village.departed),
-    village: { log: village.log, rumors: village.rumors, visits: village.visits, departed: village.departed, built: village.built, site: village.site },
+    village: { log: village.log, rumors: village.rumors, visits: village.visits, departed: village.departed, built: village.built, site: village.site, tech: village.tech },
     vill: villagers.map(v => ({ n: v.name, x: +v.x.toFixed(1), z: +v.z.toFixed(1), f: v.fear | 0, tr: v.trust | 0, a: v.anger | 0, g: !!v.grudge, gf: v.grudgeFor || null, h: v.hunger | 0, j: v.journal || [] })),
     houses: houses.map(h => ({ c: h.crushed, f: +(h.flood || 0).toFixed(2) })),
     stats: { homesLost, smiteCount, smiteRevolt, giftsReceived, kindness, tributes, nightsNear, pain: pain | 0, tyrant, stakeBuild },
@@ -4032,7 +4072,7 @@ function restore(S) {
   homesLost = st.homesLost; smiteCount = st.smiteCount; smiteRevolt = st.smiteRevolt; giftsReceived = st.giftsReceived; kindness = st.kindness; tributes = st.tributes; nightsNear = st.nightsNear; pain = st.pain;
   stakeBuild = st.stakeBuild || 0; refreshStakes();
   for (const s of S.vill) { const v = byName(s.n); if (!v || v.dead) continue; v.x = s.x; v.z = s.z; v.fear = s.f; v.trust = s.tr; v.anger = s.a; v.grudge = s.g; v.grudgeFor = s.gf; v.hunger = s.h; v.journal = s.j || []; v.memory.length = 0; }
-  if (S.village) { village.log = S.village.log || []; village.rumors = S.village.rumors || []; Object.assign(village.visits, S.village.visits || {}); village.departed = S.village.departed || []; restoreGrowth(S.village); }
+  if (S.village) { village.log = S.village.log || []; village.rumors = S.village.rumors || []; Object.assign(village.visits, S.village.visits || {}); village.departed = S.village.departed || []; restoreGrowth(S.village); restoreAges(S.village); }
   pimBond = S.pim.pimBond; pimStage = 0;
   if (S.pim.pimStage >= 1) { const d = dayNum; dayNum = 3; pimDawn(); dayNum = d; }
   if (S.pim.pimStage >= 2) { const d = dayNum; dayNum = 4; pimDawn(); dayNum = d; }
@@ -4828,6 +4868,268 @@ function restoreGrowth(V) {
   if (village.site) placeBuilding(village.site.id, village.site.p);
 }
 
+/* =========================================================
+   THE AGES: village, town, city, skyline, future, the stars
+   Every good dawn moves them forward a step. Cruelty and revolt stall them.
+   ========================================================= */
+const ERA_AT = [0, 3, 6, 9, 12, 14];   // tech level where each age begins
+const ERA_NAME = ['Village', 'Town', 'City', 'Skyline', 'Future', 'Spaceport'];
+village.tech = 0;
+var eraShown = 0; let rocket = null, cars = [], eraMats = [], roadsMesh = null, plazaBits = {}, districtSpots = null, districtGroups = [], launchT = 0, launchedToday = false;
+const eraOf = t => { let e = 0; for (let i = 0; i < ERA_AT.length; i++) if (t >= ERA_AT[i]) e = i; return e; };
+function facadeTex(style, cols = 4, rows = 8) {
+  const W = 128, H = 256, base = { brick: '#9a4f3a', stone: '#cfc6b2', glass: '#5f8399', plaster: '#e8dcc4' }[style];
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  const e = document.createElement('canvas'); e.width = W; e.height = H; const y = e.getContext('2d');
+  x.fillStyle = base; x.fillRect(0, 0, W, H); y.fillStyle = '#000'; y.fillRect(0, 0, W, H);
+  if (style === 'brick') for (let r = 0; r < H; r += 6) { x.fillStyle = 'rgba(60,25,18,0.18)'; x.fillRect(0, r, W, 1); }
+  const cw = W / cols, rh = H / rows;
+  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+    const wx = i * cw + cw * 0.22, wy = j * rh + rh * 0.2, ww = cw * 0.56, wh = rh * 0.58;
+    x.fillStyle = style === 'glass' ? '#2c4656' : '#2b2733'; x.fillRect(wx, wy, ww, wh);
+    if (style !== 'glass') { x.fillStyle = 'rgba(255,255,255,0.25)'; x.fillRect(wx, wy + wh, ww, 2); }
+    if (Math.random() < (style === 'glass' ? 0.7 : 0.5)) { y.fillStyle = style === 'glass' ? '#9fe8ff' : pick(['#ffd28a', '#ffc46b', '#ffe6b0']); y.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); }
+  }
+  if (style === 'glass') { x.fillStyle = 'rgba(255,255,255,0.12)'; for (let k = 0; k < 6; k++) x.fillRect(0, k * 44, W, 3); }
+  const t1 = new THREE.CanvasTexture(c), t2 = new THREE.CanvasTexture(e);
+  for (const t of [t1, t2]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; } t1.encoding = THREE.sRGBEncoding;
+  return [t1, t2];
+}
+const FAC = {};
+function facadeMat(style, w, h) {
+  if (!FAC[style]) FAC[style] = facadeTex(style);
+  const [map, em] = FAC[style];
+  const m = new THREE.MeshStandardMaterial({ map: map.clone(), emissiveMap: em.clone(), emissive: new THREE.Color(0xffffff), emissiveIntensity: 0, roughness: style === 'glass' ? 0.25 : 0.85, metalness: style === 'glass' ? 0.35 : 0 });
+  m.map.needsUpdate = m.emissiveMap.needsUpdate = true;
+  m.map.repeat.set(Math.max(1, Math.round(w / 8)), Math.max(1, Math.round(h / 8))); m.emissiveMap.repeat.copy(m.map.repeat);
+  eraMats.push(m); return m;
+}
+function prism(w, h, d) {   // a gabled roof: triangle extruded along z
+  const sh = new THREE.Shape(); sh.moveTo(-w / 2, 0); sh.lineTo(w / 2, 0); sh.lineTo(0, h); sh.lineTo(-w / 2, 0);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: d, bevelEnabled: false }); g.translate(0, 0, -d / 2); return g;
+}
+function eraPart(g, geo, m, x, y, z, ry = 0) { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.rotation.y = ry; o.castShadow = o.receiveShadow = true; g.add(o); return o; }
+function waterTower(g, y) {
+  const w = mat(0x6d4a32);
+  for (const [px, pz] of [[-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]]) eraPart(g, new THREE.CylinderGeometry(0.12, 0.12, 2.6, 5), w, px + 1.5, y + 1.3, pz + 1.5);
+  eraPart(g, new THREE.CylinderGeometry(1.8, 1.8, 3, 12), mat(0x8a5a3a), 1.5, y + 4.1, 1.5);
+  eraPart(g, new THREE.ConeGeometry(2, 1.4, 12), mat(0x5a3a28), 1.5, y + 6.3, 1.5);
+}
+function decoTower(g, base, tiers, style, spire) {   // stacked setbacks, like the old New York towers
+  let y = 0;
+  tiers.forEach(([w, h], i) => { eraPart(g, new THREE.BoxGeometry(base * w, h, base * w), facadeMat(style, base * w, h), 0, y + h / 2, 0); y += h; eraPart(g, new THREE.BoxGeometry(base * w + 0.8, 0.7, base * w + 0.8), mat(0xb8b0a0), 0, y, 0); });
+  if (spire === 'needle') { eraPart(g, new THREE.CylinderGeometry(0.6, 1.4, 14, 8), mat(0xc9c3b4, { metalness: 0.5, roughness: 0.4 }), 0, y + 7, 0); eraPart(g, new THREE.CylinderGeometry(0.15, 0.15, 10, 4), mat(0x8c8c8c), 0, y + 19, 0); }
+  if (spire === 'crown') for (let k = 0; k < 4; k++) eraPart(g, new THREE.ConeGeometry(base * (0.32 - k * 0.07), 5, 8), mat(0xd9d9d9, { metalness: 0.8, roughness: 0.25 }), 0, y + 2.5 + k * 4, 0);
+  return y;
+}
+function futureTower(g, r, h, twist) {
+  const glass = facadeMat('glass', r * 4, h), ring = new THREE.MeshStandardMaterial({ color: 0x9fe8ff, emissive: new THREE.Color(0x4fd8ff), emissiveIntensity: 1.2, roughness: 0.3 });
+  eraMats.push(ring); ring.userData.neon = true;
+  if (twist) { const n = Math.round(h / 6); for (let k = 0; k < n; k++) eraPart(g, new THREE.BoxGeometry(r * 1.6, 6, r * 1.6), glass, 0, k * 6 + 3, 0, k * 0.12); }
+  else eraPart(g, new THREE.CylinderGeometry(r * 0.8, r, h, 20), glass, 0, h / 2, 0);
+  for (let y = 8; y < h; y += 12) { const t = new THREE.Mesh(new THREE.TorusGeometry(r * (twist ? 1.15 : 0.95), 0.25, 6, 28), ring); t.rotation.x = Math.PI / 2; t.position.y = y; g.add(t); }
+  eraPart(g, new THREE.CylinderGeometry(r * 0.9, r * 0.9, 0.6, 20), ring, 0, h + 0.3, 0);
+}
+function houseModel(h, era) {
+  const g = new THREE.Group(), outer = hyp(h.x - VC.x, h.z - VC.z) > 60, i = houses.indexOf(h);
+  if (era === 1) {
+    eraPart(g, new THREE.BoxGeometry(8.6, 7, 7.6), mat(pick([0xe8dcc4, 0xdccfb4, 0xe2d3bd])), 0, 3.5, 0);
+    for (const sx of [-4.2, 4.2]) eraPart(g, new THREE.BoxGeometry(0.4, 7, 7.8), mat(0x5e4430), sx, 3.5, 0);
+    eraPart(g, new THREE.BoxGeometry(8.8, 0.4, 7.8), mat(0x5e4430), 0, 3.6, 0);
+    eraPart(g, prism(10, 4.6, 8.8), mat(pick([0xb5523a, 0xa4443a, 0x9a5a3a]), { roughness: 0.9 }), 0, 7, 0, Math.PI / 2);
+    eraPart(g, new THREE.BoxGeometry(1.2, 3, 1.2), mat(0x8f8a80), 2.4, 9.5, -1.5);
+    eraPart(g, new THREE.BoxGeometry(1.5, 2.6, 0.3), mat(0x4a3a33), 0, 1.3, 3.85);
+    for (const sx of [-2.6, 2.6]) eraPart(g, new THREE.BoxGeometry(1.2, 1.2, 0.3), h.winMat, sx, 4.8, 3.85);
+  } else if (era === 2 || (era === 3 && !outer)) {
+    const H = era === 2 ? 15 + (i % 3) * 5 : 24 + (i % 3) * 6;
+    eraPart(g, new THREE.BoxGeometry(9, H, 9), facadeMat('brick', 9, H), 0, H / 2, 0);
+    eraPart(g, new THREE.BoxGeometry(9.8, 0.9, 9.8), mat(0xb8b0a0), 0, H + 0.4, 0);
+    eraPart(g, new THREE.BoxGeometry(2.2, 3, 0.6), mat(0x3a2f2a), 0, 1.5, 4.6);
+    eraPart(g, new THREE.BoxGeometry(3.4, 0.6, 2), mat(0xa49f92), 0, 0.3, 5.4);
+    waterTower(g, H + 0.8);
+  } else if (era === 3) {
+    decoTower(g, 10, [[1.3, 26], [1.0, 22], [0.75, 16], [0.5, 10]], i % 2 ? 'stone' : 'brick', i % 2 ? 'needle' : 'crown');
+  } else {
+    futureTower(g, outer ? 6 : 5, outer ? 70 + (i % 3) * 15 : 28 + (i % 3) * 8, outer && i % 2 === 0);
+  }
+  g.position.set(h.x, height(h.x, h.z) - 0.2, h.z); g.rotation.y = h.grp.rotation.y;
+  g.visible = false; scene.add(g); return g;
+}
+function rubbleFor(h) {
+  const g = new THREE.Group();
+  for (let k = 0; k < 9; k++) eraPart(g, new THREE.DodecahedronGeometry(rand(0.8, 2.0), 0), mat(pick([0x9a4f3a, 0xa49f92, 0x6f93a8, 0x8f8a80])), rand(-4, 4), rand(0.3, 1.2), rand(-4, 4));
+  g.position.set(h.x, height(h.x, h.z), h.z); g.visible = false; scene.add(g); return g;
+}
+function showHouseEra(h) {
+  const e = eraShown;
+  if (!h.eraModels) h.eraModels = {};
+  if (e > 0 && !h.eraModels[e]) h.eraModels[e] = houseModel(h, e);
+  for (const k in h.eraModels) h.eraModels[k].visible = !h.crushed && +k === e;
+  h.grp.visible = e === 0 || h.crushed;
+  if (e > 0 && h.crushed) { if (!h.rubble) h.rubble = rubbleFor(h); h.rubble.visible = true; h.grp.visible = false; }
+  else if (h.rubble) h.rubble.visible = false;
+}
+function pickSpots(n, r0, r1, sep, clear, keep = () => true) {
+  const out = [];
+  for (let tries = 0; tries < 4000 && out.length < n; tries++) {
+    const a = rand(0, Math.PI * 2), r = rand(r0, r1), x = VC.x + Math.cos(a) * r, z = VC.z + Math.sin(a) * r;
+    if (hyp(x, z) > 225 || Math.abs(x - riverX(z)) < 24 || FIELDS.some(f => inField(f, x, z, 10)) || pathDist(x, z) < 9) continue;
+    if (houses.some(h => hyp(h.x - x, h.z - z) < 22) || BUILDS.some(b => hyp(b.at.x - x, b.at.z - z) < 20) || hyp(x - GRAVEYARD.x, z - GRAVEYARD.z) < 22) continue;
+    if (hyp(x - OFFER.x, z - OFFER.z) < 18 || hyp(x - SHRINE.x, z - SHRINE.z) < 45 || hyp(x + 30, z - 165) < 40 || hyp(x - PASS.x, z - PASS.z) < 60) continue;
+    if (!keep(x, z) || hyp(x - STATUE_SPOT.x, z - STATUE_SPOT.z) < 60) continue;
+    if (TREES.some(t => hyp(t.x - x, t.z - z) < clear) || out.some(o => hyp(o.x - x, o.z - z) < sep)) continue;
+    out.push({ x, z });
+  }
+  return out;
+}
+function buildRoads() {
+  const P = [], N = [], C = [], col = new THREE.Color(0x4a4a50), line = new THREE.Color(0xe8d27a);
+  const quad = (a, b, c, d, cl) => { for (const v of [a, b, c, a, c, d]) { P.push(v.x, v.y, v.z); N.push(0, 1, 0); C.push(cl.r, cl.g, cl.b); } };
+  for (const [A, B] of PATHS) {
+    const L = hyp(B.x - A.x, B.z - A.z); if (L < 4) continue;
+    const ux = (B.x - A.x) / L, uz = (B.z - A.z) / L, nx = -uz, nz = ux, W = 3, steps = Math.ceil(L / 4);
+    for (let k = 0; k < steps; k++) {
+      const t0 = k / steps, t1 = (k + 1) / steps, x0 = A.x + (B.x - A.x) * t0, z0 = A.z + (B.z - A.z) * t0, x1 = A.x + (B.x - A.x) * t1, z1 = A.z + (B.z - A.z) * t1;
+      const v = (x, z) => new THREE.Vector3(x, height(x, z) + 0.15, z);
+      quad(v(x0 - nx * W, z0 - nz * W), v(x0 + nx * W, z0 + nz * W), v(x1 + nx * W, z1 + nz * W), v(x1 - nx * W, z1 - nz * W), col);
+      if (k % 2 === 0) { const w = 0.25, lv = (x, z) => new THREE.Vector3(x, height(x, z) + 0.2, z); quad(lv(x0 - nx * w, z0 - nz * w), lv(x0 + nx * w, z0 + nz * w), lv(x1 + nx * w, z1 + nz * w), lv(x1 - nx * w, z1 - nz * w), line); }
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2 })); m.receiveShadow = true; scene.add(m); return m;
+}
+function buildPlaza(era) {
+  const y = height(VC.x, VC.z);
+  if (era >= 1 && !plazaBits.cobble) { const m = new THREE.Mesh(new THREE.CircleGeometry(17, 40), mat(0xa79c88, { roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 })); m.rotation.x = -Math.PI / 2; m.position.set(VC.x, y + 0.1, VC.z); m.receiveShadow = true; scene.add(m); plazaBits.cobble = m; }
+  if (era >= 2 && !plazaBits.fountain) {
+    const g = new THREE.Group(); eraPart(g, new THREE.CylinderGeometry(3.6, 3.9, 1.1, 24), mat(0xb8b0a0), 0, 0.55, 0); const w = eraPart(g, new THREE.CylinderGeometry(3.2, 3.2, 0.2, 24), mat(0x6fb7c0, { roughness: 0.1 }), 0, 1.0, 0); w.castShadow = false;
+    eraPart(g, new THREE.CylinderGeometry(0.5, 0.7, 3, 10), mat(0xb8b0a0), 0, 2, 0); eraPart(g, new THREE.SphereGeometry(0.9, 12, 8), mat(0x6fb7c0, { roughness: 0.1 }), 0, 3.6, 0);
+    g.position.set(VC.x, y, VC.z); scene.add(g); plazaBits.fountain = g;
+    const ct = new THREE.Group(), at = siteAt(130, 60); eraPart(ct, new THREE.BoxGeometry(5, 22, 5), mat(0xc9c0ad), 0, 11, 0); eraPart(ct, new THREE.ConeGeometry(4, 7, 4), mat(0x5a6a6a), 0, 25.5, 0, Math.PI / 4);
+    const face = new THREE.MeshStandardMaterial({ color: 0xf1ead9, emissive: new THREE.Color(0xffe6b0), emissiveIntensity: 0 }); eraMats.push(face);
+    for (const r of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) { const c = new THREE.Mesh(new THREE.CircleGeometry(1.7, 20), face); c.position.set(Math.sin(r) * 2.55, 18.5, Math.cos(r) * 2.55); c.rotation.y = r; ct.add(c); }
+    ct.position.set(at.x, height(at.x, at.z) - 0.2, at.z); scene.add(ct); plazaBits.clock = ct;
+  }
+  if (era >= 4 && !plazaBits.holo) {
+    const holo = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 1.8, 2.2), transparent: true, opacity: 0.35, toneMapped: false, depthWrite: false });
+    const g = new THREE.Group(); const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 2.4, 30, 16, 1, true), holo); beam.position.y = 15; g.add(beam);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(6, 0.3, 8, 40), holo); ring.rotation.x = Math.PI / 2; ring.position.y = 22; g.add(ring);
+    const fig = new THREE.Mesh(new THREE.CapsuleGeometry(1.6, 6, 4, 10), holo); fig.position.y = 26; g.add(fig); const hd = new THREE.Mesh(new THREE.SphereGeometry(1.3, 12, 10), holo); hd.position.y = 31.5; g.add(hd);
+    g.position.set(VC.x, y + 3.5, VC.z); scene.add(g); plazaBits.holo = g;
+  }
+}
+function buildDistrict(era) {
+  if (!districtSpots) districtSpots = pickSpots(5, 88, 135, 28, 9, (x, z) => z < 100);
+  for (const g of districtGroups) scene.remove(g); districtGroups = [];
+  districtSpots.forEach((p, i) => {
+    const g = new THREE.Group();
+    if (era === 3) decoTower(g, 11, i % 3 === 0 ? [[1.4, 34], [1.1, 30], [0.8, 26], [0.5, 14]] : [[1.2, 30], [0.9, 24], [0.6, 16]], i % 2 ? 'stone' : 'brick', i % 3 === 0 ? 'needle' : i % 3 === 1 ? 'crown' : null);
+    else futureTower(g, 7 + (i % 2) * 2, 90 + (i % 3) * 25, i % 2 === 1);
+    g.position.set(p.x, height(p.x, p.z) - 0.3, p.z); scene.add(g); districtGroups.push(g);
+  });
+}
+function makeCar() {
+  const g = new THREE.Group(), body = mat(pick([0xc9493c, 0xf1ead9, 0x2f6f74, 0xd9a441, 0x5b4a8a]), { metalness: 0.4, roughness: 0.35 });
+  const b = new THREE.Mesh(new THREE.CapsuleGeometry(1.1, 3.2, 4, 10), body); b.rotation.z = Math.PI / 2; g.add(b);
+  const glass = new THREE.Mesh(new THREE.SphereGeometry(1.0, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x9fe8ff, { roughness: 0.1, metalness: 0.5 })); glass.position.y = 0.6; g.add(glass);
+  const lite = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.6, 0.6), toneMapped: false });
+  const tail = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.5, 0.3, 0.3), toneMapped: false })); tail.position.x = -2.6; g.add(tail);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), lite); head.position.x = 2.6; g.add(head);
+  for (const sz of [-1.3, 1.3]) { const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 1.6, 2.2), toneMapped: false })); pod.position.set(0, -0.9, sz); g.add(pod); }
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  scene.add(g); return g;
+}
+function buildCars() {
+  if (cars.length) return;
+  for (let i = 0; i < 12; i++) cars.push({ m: makeCar(), r: i < 6 ? rand(74, 84) : rand(140, 165), y: rand(34, 70), a: rand(0, Math.PI * 2), sp: rand(0.12, 0.22) * (i % 2 ? 1 : -1), bob: rand(0, 6), wob: rand(4, 10) });
+}
+function buildSpaceport() {
+  if (rocket) return;
+  const spot = pickSpots(1, 140, 200, 0, 18, (x, z) => z < -30)[0] || pickSpots(1, 140, 200, 0, 12)[0] || { x: -120, z: -40 };
+  const y = height(spot.x, spot.z), pad = new THREE.Group();
+  eraPart(pad, new THREE.CylinderGeometry(14, 15, 1.6, 32), mat(0x8f8a80), 0, 0.8, 0);
+  eraPart(pad, new THREE.TorusGeometry(10, 0.4, 6, 40), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.4, 0.4), toneMapped: false }), 0, 1.7, 0).rotation.x = Math.PI / 2;
+  for (let k = 0; k < 4; k++) eraPart(pad, new THREE.BoxGeometry(1.2, 44, 1.2), mat(0xc9493c), 9 + (k % 2) * 2.4, 22, -2 + Math.floor(k / 2) * 2.4);
+  for (let yy = 6; yy < 44; yy += 7) eraPart(pad, new THREE.BoxGeometry(3.6, 0.5, 3.6), mat(0xc9493c), 10.2, yy, -0.8);
+  pad.position.set(spot.x, y, spot.z); scene.add(pad);
+  rocket = { pad, spot, y, ship: null, flying: 0, flame: null };
+  newShip();
+}
+function newShip() {
+  const R = rocket, g = new THREE.Group(), white = mat(0xf1ead9, { roughness: 0.4 }), red = mat(0xc9493c);
+  eraPart(g, new THREE.CylinderGeometry(3, 3.2, 30, 20), white, 0, 15, 0);
+  eraPart(g, new THREE.ConeGeometry(3, 9, 20), red, 0, 34.5, 0);
+  for (const y of [6, 22]) eraPart(g, new THREE.CylinderGeometry(3.25, 3.25, 1.5, 20), red, 0, y, 0);
+  for (let k = 0; k < 4; k++) { const f = eraPart(g, new THREE.BoxGeometry(0.5, 7, 4), red, 0, 3.5, 0, k * Math.PI / 2); f.position.x = Math.sin(k * Math.PI / 2) * 3.6; f.position.z = Math.cos(k * Math.PI / 2) * 3.6; }
+  const win = new THREE.Mesh(new THREE.CircleGeometry(1.1, 16), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 1.8, 2.2), toneMapped: false })); win.position.set(0, 26, 3.22); g.add(win);
+  // their name for you, painted on the side
+  const c = document.createElement('canvas'); c.width = c.height = 96; const im = new Image(); const tex = new THREE.CanvasTexture(c);
+  im.onload = () => { c.getContext('2d').drawImage(im, 0, 0, 96, 96); tex.needsUpdate = true; }; im.src = GLYPH.name;
+  const decal = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2), new THREE.MeshBasicMaterial({ map: tex, transparent: true })); decal.position.set(0, 14, 3.25); g.add(decal);
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(2.6, 12, 14), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 2, 0.6), toneMapped: false, transparent: true, opacity: 0.9 }));
+  flame.rotation.x = Math.PI; flame.position.y = -6; flame.visible = false; g.add(flame);
+  g.position.set(R.spot.x, R.y + 1.6, R.spot.z); scene.add(g);
+  R.ship = g; R.flame = flame; R.flying = 0;
+}
+function launchShip() {
+  const R = rocket; if (!R || !R.ship || R.flying) return;
+  R.flying = 0.001; launchedToday = true;
+  toast('<span><b>Liftoff.</b> Their ship rises past your head toward the stars, with your name painted on its side.</span>');
+  think('launch', 'They are leaving the ground. They wrote my name on the side. They are taking me with them.');
+  journalAll('our first ship rose toward the stars'); villageLog('launched a ship to the stars');
+  for (const v of villagers) if (!v.hidden) { v.singT = gameTime + 20; v.fear = Math.max(0, v.fear - 20); }
+}
+function applyEra(instant) {
+  const e = eraOf(village.tech);
+  if (e === eraShown && !instant) return;
+  const rising = e > eraShown; eraShown = e;
+  $('#season-text').textContent = SEASON_NAME[season] + (e ? ' · ' + ERA_NAME[e] : '');
+  for (const h of houses) { showHouseEra(h); if (rising && !instant && !h.crushed) burst(h.x, height(h.x, h.z) + 2, h.z, 14, 'dust'); }
+  buildPlaza(e);
+  if (e >= 2) { if (!roadsMesh) roadsMesh = buildRoads(); if (!buildGroups.lanterns || !buildGroups.lanterns.lanterns) { if (!buildGroups.lanterns) buildGroups.lanterns = { g: new THREE.Group(), sc: new THREE.Group(), lanterns: null }; buildGroups.lanterns.lanterns = lanternPosts(); } }
+  if (e >= 3) buildDistrict(e >= 4 ? 4 : 3);
+  if (e >= 4) { buildCars(); buildSpaceport(); }
+  if (!instant && rising) {
+    const msg = { 1: ['The village is becoming a <b>town</b>. Stone cottages are going up where the huts stood.', 'They are building in stone now. Things that last.'],
+      2: ['It is a <b>city</b> now. Brick buildings, roads, streetlights, and a clock tower.', 'Roads. A clock. They count the hours now, not my footsteps.'],
+      3: ['<b>Towers.</b> Their city reaches higher than your head.', 'I used to look down on their roofs. Now their towers look down on me.'],
+      4: ['The <b>future</b> arrived. Glass towers, and cars that fly.', 'Their cars fly past my face. They are not afraid of the sky anymore.'],
+      5: ['They built a <b>rocket</b>. It launches today.', 'A ship. Pointed at the stars. They want more than this valley now.'] }[e];
+    if (msg) { toast(`<span>${msg[0]}</span>`); think('era' + e, msg[1], true); journalAll(`our home became a ${ERA_NAME[e].toLowerCase()}`); }
+  }
+}
+function techDawn() {
+  if (ending) return;
+  const T = villageMoodAvg(), ad = villagers.filter(v => !v.dead && isAdult(v));
+  if ((T.trust >= 30 || tyrant) && revoltStage < 2 && ad.length >= 4) { village.tech++; applyEra(false); }
+  launchedToday = false;
+}
+function updateAges(dt) {
+  const n = NIGHT;
+  for (const m of eraMats) m.emissiveIntensity = m.userData.neon ? 0.8 + n * 1.2 : n * 1.5;
+  for (const c of cars) {
+    c.a += c.sp * dt; const x = VC.x + Math.cos(c.a) * c.r, z = VC.z + Math.sin(c.a) * c.r;
+    c.m.position.set(x, c.y + Math.sin(gameTime * 0.7 + c.bob) * c.wob * 0.3, z);
+    const sg = Math.sign(c.sp); c.m.rotation.y = Math.atan2(-sg * Math.cos(c.a), -sg * Math.sin(c.a));
+  }
+  if (plazaBits.holo) plazaBits.holo.rotation.y += dt * 0.6;
+  const R = rocket;
+  if (R && R.ship) {
+    if (!R.flying && eraShown >= 5 && !launchedToday && !ending && phaseOf(tDay) === 'day' && tDay > 0.3) launchShip();
+    if (R.flying) {
+      R.flying += dt; const t = R.flying;
+      R.flame.visible = true; R.flame.scale.set(1 + Math.sin(gameTime * 40) * 0.1, 1 + Math.sin(gameTime * 33) * 0.2 + Math.min(t, 2) * 0.4, 1);
+      const rise = t < 2 ? 0 : (t - 2) * (t - 2) * 6;
+      R.ship.position.y = R.y + 1.6 + rise;
+      if (t < 2) shake = Math.min(0.9, shake + dt * 0.6);
+      if (Math.random() < dt * 30) puff(R.ship.position.x + rand(-3, 3), R.ship.position.y - 4, R.ship.position.z + rand(-3, 3));
+      if (t < 3 && Math.random() < dt * 12) burst(R.spot.x + rand(-8, 8), R.y + 2, R.spot.z + rand(-8, 8), 3, 'smoke');
+      if (rise > 900) { scene.remove(R.ship); R.ship = null; R.flying = 0; setTimeout(() => { if (rocket && !rocket.ship) newShip(); }, ending ? 1500 : 60000); }
+    }
+  }
+}
+function restoreAges(V) { village.tech = (V && V.tech) || 0; applyEra(true); }
+
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
 window.addEventListener('pagehide', () => saveGame(true));
 
@@ -4839,6 +5141,7 @@ const _hA = new THREE.Vector3(), _hB = new THREE.Vector3();
 let prevPhaseKey = '';
 function updateGiant(dt) {
   const G = giant, M = G.model;
+  if (G.frozen) { M.root.position.set(G.x, M.root.position.y, G.z); return; }
   // input
   let ix = 0, iz = 0;
   if (keys.KeyW || keys.ArrowUp) iz += 1;
@@ -4863,6 +5166,8 @@ function updateGiant(dt) {
   const f = giantForward();
   G.x += f.x * G.speed * dt; G.z += f.z * G.speed * dt;
   const r = hyp(G.x, G.z); if (r > WORLD_R) { G.x *= WORLD_R / r; G.z *= WORLD_R / r; }
+  if (eraShown >= 3 && districtSpots) for (const p of districtSpots) { const dx = G.x - p.x, dz = G.z - p.z, d = hyp(dx, dz), R = 15; if (d < R && d > 0.01) { G.x = p.x + dx / d * R; G.z = p.z + dz / d * R; } }
+  if (rocket) { const dx = G.x - rocket.spot.x, dz = G.z - rocket.spot.z, d = hyp(dx, dz); if (d < 20 && d > 0.01) { G.x = rocket.spot.x + dx / d * 20; G.z = rocket.spot.z + dz / d * 20; } }
   G.moveAmt = lerp(G.moveAmt, moving ? 1 : 0, dt * 4);
   G.kneel = lerp(G.kneel, G.kneeling ? 1 : 0, dt * 2.2);
   if (G.kneeling && G.kneel > 0.95) G.stillT += dt; else if (!G.kneeling) G.stillT = 0;
@@ -4974,6 +5279,13 @@ function updateGiant(dt) {
 }
 function updateCamera(dt) {
   const G = giant, k = G.kneel;
+  if (ending && ending.kind === 'stay' && ending.epi) {
+    const E = ending.epi, f = giantForward(), gy = height(G.x, G.z), sway = Math.sin(E.t * 0.06) * 0.5;
+    const back = 95 + Math.min(E.t, 36) * 1.6, up = 60 + Math.min(E.t, 36) * 2.2;
+    camera.position.lerp(_v.set(G.x - f.x * back + f.z * 45 * (1 + sway), gy + up, G.z - f.z * back - f.x * 45 * (1 + sway)), 0.03);
+    camera.lookAt(lerp(G.x, VC.x, 0.75), gy + 22 + Math.min(E.t, 36) * 0.8, lerp(G.z, VC.z, 0.75));
+    return;
+  }
   if (ending && ending.kind === 'stay') {
     const f = giantForward(), gy = height(G.x, G.z);
     const t = Math.min(1, ending.t / 5);
@@ -5006,13 +5318,13 @@ function updateIntroCamera(dt) {
 
 function updateWorld(dt) {
   gameTime += dt;
-  if (ending && ending.kind === 'leave') tDay = 0.8; else tDay += dt / DAY_LEN;
-  if (tDay >= 1) { tDay -= 1; dayNum++; setSeason(seasonOf(dayNum)); saveGame(); for (const v of villagers) v.offeredToday = false; for (const t of TREES) if (t.fruitIdx.length && !t.fruit) setTreeFruit(t, true); }
+  if (ending && ending.kind === 'leave') tDay = 0.8; else tDay += dt / (ending && ending.epi && ending.epi.ok ? 3 : ending && ending.epi ? 4 : DAY_LEN);
+  if (tDay >= 1) { tDay -= 1; dayNum++; if (!(ending && ending.epi)) setSeason(seasonOf(dayNum)); saveGame(); for (const v of villagers) v.offeredToday = false; for (const t of TREES) if (t.fruitIdx.length && !t.fruit) setTreeFruit(t, true); }
   const ph = phaseOf(tDay);
   if (ph !== prevPhaseKey) {
     if (ph === 'dusk') { if (funeral) think('funeral-' + funeral.name, `They are not singing for me tonight. They are burying ${funeral.name}.`, true); else think('dusk', 'They are gathering in the plaza. They sing for me every night.'); }
     if (ph === 'night') { think('night', 'They all go inside at night. I wish they would not hide from me.'); if (hyp(giant.x - VC.x, giant.z - VC.z) < 150) nightsNear++; if (funeral) funeral = null; for (const v of villagers) v.mournAt = null; }
-    if (ph === 'dawn') { pimDawn(); startNextBuilding(); for (const gr of graves) if (gr.flowers < 3 && villagers.some(v => kinOf({ name: gr.name, homeHouse: null }).has(v.name) || v.grudgeFor === gr.name)) { gr.flowers++; const f = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 0), mat(pick([0xf1b7c8, 0xf4e3a0, 0xf6f0e6]))); f.position.set(gr.x + rand(-1.2, 1.2), height(gr.x, gr.z) + 0.4, gr.z + 1.5 + rand(-0.6, 0.6)); scene.add(f); } }
+    if (ph === 'dawn') { pimDawn(); techDawn(); startNextBuilding(); for (const gr of graves) if (gr.flowers < 3 && villagers.some(v => kinOf({ name: gr.name, homeHouse: null }).has(v.name) || v.grudgeFor === gr.name)) { gr.flowers++; const f = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 0), mat(pick([0xf1b7c8, 0xf4e3a0, 0xf6f0e6]))); f.position.set(gr.x + rand(-1.2, 1.2), height(gr.x, gr.z) + 0.4, gr.z + 1.5 + rand(-0.6, 0.6)); scene.add(f); } }
     if (ph === 'day' && prevPhaseKey === 'dawn' && dayNum > 1 && basket.visible) think('day' + dayNum, `Day ${dayNum}. The bread is still there at the stone.`);
     if (ph === 'dusk' && basket.visible) basket.visible = false;
     prevPhaseKey = ph;
@@ -5156,7 +5468,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // test hook (used only by automated checks)
-window.__gg = { startNextBuilding, finishBuilding, helpBuild, stompSite, BUILDS, giant, villagers, words, houses, heardLog, LINES, start: begin, footstep, get tDay() { return tDay; }, set tDay(v) { tDay = v; }, get gameTime() { return gameTime; }, lockedCount, keys, useAction, village, rulesCouncil, requestCouncil, startCouncil, cleanPlans, councilPayload, startPlan, giantAsksPeace, saveGame, snapshot, get season() { return season; }, get weather() { return weather; }, setSeason, rollWeather, recordEnding, renderTitle, applyEdit, shape, boulders, liftBoulder, dropBoulder, helpRebuild, editAt, earnAspect, setAspect, get aspect() { return aspect; }, graves, get pim() { return { pimBond, pimStage, pimPath }; }, set pimBondV(v) { pimBond = v; }, pimDawn, set dayN(v) { dayNum = v; }, get dayN() { return dayNum; }, piles, FIELDS, TREES, smite, killVillager, openSpeak, interpret, startReveal, startLeave, startStay, readTablet, scriptW, get state() { return { revoltStage, tyrant, pain, smiteCount, scriptActive, nameUnsealed, tablet: !!tablet, ending, unrest: unrest(), giftsReceived, homesLost }; }, setTalk(r) { sentence = r; }, doSpeak, findTarget, unrest, cam(y, p, z) { camYaw = y; camPitch = p; camZoom = z; },
+window.__gg = { get ending() { return ending; }, applyEra, techDawn, launchShip, get era() { return eraShown; }, startNextBuilding, finishBuilding, helpBuild, stompSite, BUILDS, giant, villagers, words, houses, heardLog, LINES, start: begin, footstep, get tDay() { return tDay; }, set tDay(v) { tDay = v; }, get gameTime() { return gameTime; }, lockedCount, keys, useAction, village, rulesCouncil, requestCouncil, startCouncil, cleanPlans, councilPayload, startPlan, giantAsksPeace, saveGame, snapshot, get season() { return season; }, get weather() { return weather; }, setSeason, rollWeather, recordEnding, renderTitle, applyEdit, shape, boulders, liftBoulder, dropBoulder, helpRebuild, editAt, earnAspect, setAspect, get aspect() { return aspect; }, graves, get pim() { return { pimBond, pimStage, pimPath }; }, set pimBondV(v) { pimBond = v; }, pimDawn, set dayN(v) { dayNum = v; }, get dayN() { return dayNum; }, piles, FIELDS, TREES, smite, killVillager, openSpeak, interpret, startReveal, startLeave, startStay, readTablet, scriptW, get state() { return { revoltStage, tyrant, pain, smiteCount, scriptActive, nameUnsealed, tablet: !!tablet, ending, unrest: unrest(), giftsReceived, homesLost }; }, setTalk(r) { sentence = r; }, doSpeak, findTarget, unrest, cam(y, p, z) { camYaw = y; camPitch = p; camZoom = z; },
   sim(sec) { for (let t = 0; t < sec; t += 0.05) { updateGiant(0.05); updateWorld(0.05); updateMono(0.05); updateBubbles(0.05); } } };
 })();
 </script>
