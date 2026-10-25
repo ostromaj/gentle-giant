@@ -233,7 +233,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 <div class="hud" id="hud-help" hidden>
   <b>Walk</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp; <b>Look</b> drag the mouse<br>
   <b>Tread lightly</b> hold <kbd>Shift</kbd> to step over huts &nbsp; <b>Kneel</b> <kbd>E</kbd><br>
-  <b>Scoop water, pick fruit, pour, drop</b> <kbd>F</kbd><br>
+  <b>Scoop water, pick fruit, lift someone, set down</b> <kbd>F</kbd><br>
   <b>Speak</b> <kbd>T</kbd> &nbsp; <b>Smite</b> <kbd>Q</kbd> at the ringed villager<br>
   <b>Change Aspect</b> <kbd>R</kbd> once you have one<br>
   <b>Dig</b> hold <kbd>Z</kbd> &nbsp; <b>Raise ground</b> hold <kbd>X</kbd><br>
@@ -259,7 +259,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 
 <section id="start" aria-labelledby="title">
   <div class="start-inner">
-    <div class="build">Playable build 0.10</div>
+    <div class="build">Playable build 0.11</div>
     <h1 id="title">Gentle Giant</h1>
     <p class="tag">They sing for you every night. Learn what they're singing.</p>
     <button class="continue" type="button" id="continue" hidden><b>Continue</b><span id="continue-sub"></span></button>
@@ -378,7 +378,7 @@ function height(x, z) {
   h += 26 * Math.exp(-(ds * ds) / (2 * 45 * 45));
   const dv = hyp(x - VC.x, z - VC.z);
   if (z > 140) { const pd = x + 40; h -= smooth(195, 330, r) * 75 * Math.exp(-(pd * pd) / (2 * 26 * 26)) * smooth(140, 230, z) * 0.82; }
-  h = lerp(h, 3.2, 1 - smooth(38, 75, dv));
+  h = lerp(h, 3.2, 1 - smooth(76, 108, dv));
   const dr = Math.abs(x - riverX(z));
   const ch = (1 - smooth(5, 17, dr)) * (1 - smooth(205, 250, r));
   h = lerp(h, -3.6, ch);
@@ -722,8 +722,9 @@ function makeHut(x, z, big = false, name = '') {
   houses.push(h);
   return h;
 }
-for (let i = 0; i < 9; i++) {
-  const a = i / 9 * Math.PI * 2 + 0.35, rr = 26 + (i % 3) * 4;
+// huts sit in loose clusters with lanes between them, wide enough for a careful giant to walk through
+for (const [deg, rr] of [[25, 34], [62, 44], [48, 70], [135, 41], [150, 66], [282, 37], [318, 48], [300, 71], [345, 66]]) {
+  const a = deg * Math.PI / 180;
   makeHut(VC.x + Math.cos(a) * rr, VC.z + Math.sin(a) * rr);
 }
 const HALL = makeHut(-30, 14, true, 'the hall');
@@ -792,9 +793,9 @@ function buildFlora() {
   while (n < N && tries < 5000) {
     tries++;
     const near = n < 40;  // keep a ring of trees close to the village, many with fruit
-    const a = Math.random() * Math.PI * 2, r = near ? rand(58, 115) : 45 + Math.sqrt(Math.random()) * 200;
+    const a = Math.random() * Math.PI * 2, r = near ? rand(84, 130) : 45 + Math.sqrt(Math.random()) * 200;
     const x = (near ? VC.x : 0) + Math.cos(a) * r, z = (near ? VC.z : 0) + Math.sin(a) * r;
-    if (hyp(x, z) > 245 || hyp(x - VC.x, z - VC.z) < 54 || Math.abs(x - riverX(z)) < 18 || FIELDS.some(f => inField(f, x, z, 6))) continue;
+    if (hyp(x, z) > 245 || hyp(x - VC.x, z - VC.z) < 80 || Math.abs(x - riverX(z)) < 18 || FIELDS.some(f => inField(f, x, z, 6))) continue;
     if (hyp(x - OFFER.x, z - OFFER.z) < 14 || hyp(x - SHRINE.x, z - SHRINE.z) < 18 || hyp(x + 30, z - 165) < 30 || pathDist(x, z) < 5) continue;
     const y = height(x, z), th = rand(3, 6), cr = rand(2.6, 5.0);
     q.identity(); s.set(1, th, 1); pV.set(x, y + th / 2 - 0.3, z); m.compose(pV, q, s); trunk.setMatrixAt(n, m);
@@ -900,6 +901,7 @@ function setTreeFruit(t, on) {
 PATHS.push(
   [VC, OFFER], [VC, { x: riverX(VC.z) - 14, z: VC.z }], [VC, { x: -25, z: -19 }], [VC, { x: -65, z: 54 }],
   [VC, HALL.door], [{ x: -25, z: -19 }, { x: SHRINE.x + 16, z: SHRINE.z + 16 }], [{ x: riverX(30) + 14, z: 30 }, { x: 139, z: 30 }]);
+for (const h of houses) if (h !== HALL) PATHS.push([{ x: VC.x + (h.x - VC.x) * 0.25, z: VC.z + (h.z - VC.z) * 0.25 }, h.door]);  // a footpath to every door
 buildTerrain(); buildFields(); buildFlora();
 { // remember where every grass tuft, tree and rock stands, so shaped ground can carry them
   const m4 = new THREE.Matrix4();
@@ -1474,15 +1476,16 @@ function makeGiant(kind) {
   const footL = new THREE.Object3D(); footL.position.set(0, -S.shin - 1.2, 1.4); B.kneeL.add(footL);
   const footR = new THREE.Object3D(); footR.position.set(0, -S.shin - 1.2, 1.4); B.kneeR.add(footR);
   const palm = new THREE.Object3D(); palm.position.set(-0.4, -S.forearm - 1.6, 0.6); B.elR.add(palm);
+  const palmL = new THREE.Object3D(); palmL.position.set(0.4, -S.forearm - 1.6, 0.6); B.elL.add(palmL);
   const carry = new THREE.Group(); carry.position.set(0, 8.5, 12.5); B.torso.add(carry);
-  const water = new THREE.Mesh(new THREE.SphereGeometry(3.6, 24, 16), mat(0x6fb7c0, { roughness: 0.15, transparent: true, opacity: 0.78 }));
-  water.scale.y = 0.7; carry.add(water);
+  const water = new THREE.Mesh(new THREE.SphereGeometry(3.0, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.62), mat(0x6fb7c0, { roughness: 0.12, transparent: true, opacity: 0.82 }));
+  water.rotation.x = Math.PI; water.position.y = 1.1; water.scale.y = 0.55; carry.add(water);
   const fruit = new THREE.Group(); carry.add(fruit);
-  for (let i = 0; i < 7; i++) { const f = new THREE.Mesh(new THREE.SphereGeometry(1.2, 14, 10), mat(i % 3 ? 0xe0803a : 0xd8b040)); f.position.set(Math.cos(i * 1.9) * 1.8, (i % 2) * 1.3, Math.sin(i * 1.9) * 1.3); f.castShadow = true; fruit.add(f); }
+  for (let i = 0; i < 7; i++) { const f = new THREE.Mesh(new THREE.SphereGeometry(1.05, 14, 10), mat(i % 3 ? 0xe0803a : 0xd8b040)); f.position.set(Math.cos(i * 1.9) * 1.4, 0.9 + (i % 2) * 1.0, Math.sin(i * 1.9) * 1.0); f.castShadow = true; fruit.add(f); }
   water.visible = fruit.visible = false;
   root.traverse(o => { if (o.isMesh && o !== body) o.castShadow = true; });
   return {
-    root, body, kind, lids, carry, water, fruit, palm, cape, irisMats, skel: S, bodyMat: skinMat, boneList: G.boneList, B,
+    root, body, kind, lids, carry, water, fruit, palm, palmL, cape, irisMats, skel: S, bodyMat: skinMat, boneList: G.boneList, B,
     pelvis: B.pelvis, torso: B.torso, neck: B.neck, head: B.head,
     L: { hip: B.hipL, knee: B.kneeL, foot: footL }, R: { hip: B.hipR, knee: B.kneeR, foot: footR },
     AL: { sh: B.shL, el: B.elL }, AR: { sh: B.shR, el: B.elR },
@@ -1765,28 +1768,103 @@ const ROLE_LOOK = {
 const ROLE_TITLE = { keeper: 'Keeper', rebel: 'Rebel', wanderer: 'Wanderer', child: 'Child', mother: 'Mother', priest: 'Priest', elder: 'Elder', skeptic: 'Skeptic', builder: 'Builder', farmer: 'Farmer', carrier: 'Water carrier', baker: 'Baker' };
 const skinTones = [0xe0b48f, 0xc9966f, 0xa8775a, 0xe8c4a0, 0x8f6248];
 
+// bake many small parts into one vertex-coloured mesh, so a detailed villager stays cheap to draw
+const _bm = new THREE.Matrix4(), _bq = new THREE.Quaternion(), _be = new THREE.Euler(), _bc = new THREE.Color();
+function bakeParts(parts) {
+  const P = [], N = [], C = [];
+  for (const [geo0, hex, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0] of parts) {
+    const geo = geo0.index ? geo0.toNonIndexed() : geo0.clone();
+    _be.set(rx, ry, rz); _bq.setFromEuler(_be); _bm.compose(new THREE.Vector3(x, y, z), _bq, new THREE.Vector3(sx, sy, sz));
+    geo.applyMatrix4(_bm);
+    const pa = geo.attributes.position, na = geo.attributes.normal; _bc.set(hex);
+    for (let i = 0; i < pa.count; i++) { P.push(pa.getX(i), pa.getY(i), pa.getZ(i)); N.push(na.getX(i), na.getY(i), na.getZ(i)); C.push(_bc.r, _bc.g, _bc.b); }
+    geo.dispose();
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  return g;
+}
+const hairTones = [0x2b1d16, 0x4a2f1d, 0x6e4426, 0x9a6a36, 0x1d1a1f, 0x7a3b22];
+const V_GEO = {
+  sph: new THREE.SphereGeometry(1, 14, 10), sphLo: new THREE.SphereGeometry(1, 8, 6), cap: new THREE.CapsuleGeometry(1, 1, 4, 10),
+  cyl: new THREE.CylinderGeometry(1, 1, 1, 12), box: new THREE.BoxGeometry(1, 1, 1), cone: new THREE.ConeGeometry(1, 1, 14),
+  hairTop: new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.56),
+  smile: new THREE.TorusGeometry(1, 0.22, 4, 10, Math.PI),
+  ring: new THREE.TorusGeometry(1, 0.12, 6, 20),
+};
+function tunicGeo(robe, flare) {
+  const pts = (robe ? [[0.66 * flare, 0.08], [0.62, 0.5], [0.55, 1.0]] : [[0.62 * flare, 0.62], [0.56, 0.9]]).concat([[0.5, 1.3], [0.56, 1.66], [0.5, 1.88], [0.34, 2.0], [0.001, 2.04]]);
+  return new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 18);
+}
 function makeVillagerMesh(role) {
-  const look = ROLE_LOOK[role];
+  const look = ROLE_LOOK[role], child = role === 'child';
   const g = new THREE.Group();
   const body = new THREE.Group(); g.add(body);
-  const add = (geo, m, x, y, z, sx = 1, sy = 1, sz = 1) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = true; body.add(o); return o; };
-  const skin = mat(pick(skinTones));
-  add(new THREE.CapsuleGeometry(0.6, 0.9, 6, 12), mat(look.col), 0, 1.05, 0, 1, 1, 0.85);
-  const head = add(new THREE.SphereGeometry(0.55, 16, 12), skin, 0, 2.45, 0);
-  const dark = mat(0x231d26);
-  add(new THREE.SphereGeometry(0.08, 6, 6), dark, -0.2, 2.5, 0.5); add(new THREE.SphereGeometry(0.08, 6, 6), dark, 0.2, 2.5, 0.5);
-  if (look.hat === 'tall') add(new THREE.ConeGeometry(0.5, 1.5, 14), mat(0x4a3566), 0, 3.4, 0);
-  if (look.hat === 'cap') add(new THREE.SphereGeometry(0.58, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x6d4a32), 0, 2.6, 0);
-  if (look.hat === 'straw') { add(new THREE.CylinderGeometry(1.0, 1.0, 0.08, 18), mat(0xdcbc6c), 0, 2.85, 0); add(new THREE.ConeGeometry(0.5, 0.5, 14), mat(0xdcbc6c), 0, 3.1, 0); }
-  if (look.hair) add(new THREE.SphereGeometry(0.6, 14, 10), mat(look.hair), 0, 2.6, -0.12, 1, 0.9, 1);
-  if (look.hood) add(new THREE.ConeGeometry(0.75, 1.3, 14), mat(0x3b4545), 0, 2.85, -0.1);
-  if (look.pot) add(new THREE.CylinderGeometry(0.45, 0.32, 0.6, 12), mat(0xb5734e), 0, 3.25, 0);
-  if (look.apron) add(new THREE.BoxGeometry(0.9, 0.9, 0.1), mat(0xf0e6d0), 0, 1.0, 0.5);
+  const vmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0 });
+  const skinHex = pick(skinTones), skinC = new THREE.Color(skinHex);
+  const noseHex = skinC.clone().multiplyScalar(0.9).getHex(), blushHex = skinC.clone().lerp(new THREE.Color(0xe0707a), 0.35).getHex();
+  const cloth = look.col, clothC = new THREE.Color(cloth);
+  const trouser = clothC.clone().multiplyScalar(0.5).getHex(), trim = clothC.clone().lerp(new THREE.Color(0xf1ead9), 0.45).getHex();
+  const hair = look.hair || pick(hairTones);
+  const robe = role === 'priest' || role === 'elder' || role === 'mother';
+  const hs = child ? 1.18 : 1;                       // children have bigger heads
+  const HY = 2.5, HR = 0.5 * hs;
+  const S = V_GEO, parts = [];
+  const P = (...a) => parts.push(a);
+  // clothes
+  P(tunicGeo(robe, role === 'mother' ? 1.2 : 1.05), cloth);
+  P(S.ring, 0x5e4430, 0, 1.08, 0, 0.53, 0.53, 0.53, Math.PI / 2);
+  P(S.box, 0xc9a24e, 0, 1.08, 0.53, 0.14, 0.12, 0.05);
+  P(S.ring, trim, 0, 1.96, 0, 0.33, 0.33, 0.5, Math.PI / 2);
+  P(S.cyl, skinHex, 0, 2.05, 0, 0.16, 0.25, 0.16);
+  // head and face
+  P(S.sph, skinHex, 0, HY, 0, HR, HR * 1.02, HR * 0.95);
+  for (const sx of [-1, 1]) {
+    P(S.sphLo, skinHex, sx * HR * 0.97, HY - 0.03, 0, 0.06 * hs, 0.11 * hs, 0.08 * hs);
+    P(S.sphLo, 0xf6f1e6, sx * 0.18 * hs, HY + 0.06 * hs, HR * 0.84, 0.1 * hs, 0.11 * hs, 0.06 * hs);
+    P(S.sphLo, 0x231d26, sx * 0.18 * hs, HY + 0.05 * hs, HR * 0.84 + 0.05 * hs, 0.06 * hs, 0.07 * hs, 0.03 * hs);
+    P(S.box, hair, sx * 0.18 * hs, HY + 0.22 * hs, HR * 0.86, 0.17 * hs, 0.045 * hs, 0.05, 0, 0, sx * -0.12);
+    P(S.sphLo, blushHex, sx * 0.3 * hs, HY - 0.1 * hs, HR * 0.8, 0.08 * hs, 0.05 * hs, 0.03);
+  }
+  P(S.sphLo, noseHex, 0, HY - 0.02 * hs, HR * 0.96, 0.075 * hs, 0.08 * hs, 0.09 * hs);
+  P(S.smile, 0x8a3d3d, 0, HY - 0.17 * hs, HR * 0.9, 0.09 * hs, 0.07 * hs, 0.09 * hs, 0, 0, Math.PI);
+  // hair, by role and a little luck
+  const style = look.hat === 'tall' ? 'short' : role === 'elder' ? 'bun' : role === 'mother' ? 'long' : child ? pick(['short', 'braids', 'tuft']) : pick(['short', 'short', 'long', 'bun', 'braids']);
+  if (!look.hood) P(S.hairTop, hair, 0, HY + 0.02, -0.03, HR * 1.07, HR * 1.07, HR * 1.07, -0.42);
+  if (!look.hood && style === 'bun') P(S.sph, hair, 0, HY + 0.32 * hs, -0.42 * hs, 0.22 * hs, 0.22 * hs, 0.22 * hs);
+  if (!look.hood && style === 'long') P(S.sph, hair, 0, HY - 0.32, -0.28, 0.48 * hs, 0.62 * hs, 0.26 * hs);
+  if (!look.hood && style === 'braids') for (const sx of [-1, 1]) P(S.cap, hair, sx * 0.42 * hs, HY - 0.38, -0.05, 0.09, 0.22, 0.09);
+  if (!look.hood && style === 'tuft') P(S.cone, hair, 0.05, HY + HR + 0.08, 0.05, 0.12, 0.28, 0.12, 0.2, 0, -0.3);
+  if (role === 'elder') P(S.sph, 0xe8e4dc, 0, HY - 0.3, HR * 0.62, 0.3, 0.36, 0.2);
+  // hats and role details
+  if (look.hat === 'tall') { P(S.cone, 0x4a3566, 0, HY + 0.85, 0, 0.5, 1.5, 0.5); P(S.ring, 0xc9a24e, 0, HY + 0.32, 0, 0.47, 0.47, 0.6, Math.PI / 2); for (const sx of [-1, 1]) P(S.box, 0xc9a24e, sx * 0.16, 1.45, 0.47, 0.1, 0.9, 0.04, -0.12); }
+  if (look.hat === 'cap') { P(S.hairTop, 0x6d4a32, 0, HY + 0.08, 0, HR * 1.1, HR * 0.95, HR * 1.1); P(S.cyl, 0x6d4a32, 0, HY + 0.12, HR * 0.8, 0.3, 0.04, 0.22); P(S.cyl, 0x8c8c8c, 0.52, 0.95, 0.1, 0.05, 0.5, 0.05, 0, 0, 0.2); P(S.box, 0x6a6a6a, 0.57, 1.2, 0.1, 0.12, 0.12, 0.28); }
+  if (look.hat === 'straw') { P(S.cyl, 0xdcbc6c, 0, HY + 0.36, 0, 1.0, 0.07, 1.0); P(S.cone, 0xdcbc6c, 0, HY + 0.6, 0, 0.5, 0.5, 0.5); P(S.ring, 0xa4443a, 0, HY + 0.42, 0, 0.42, 0.42, 0.7, Math.PI / 2); P(S.cone, 0xa4443a, 0, 1.82, 0.36, 0.2, 0.3, 0.06, Math.PI); }
+  if (look.hood) { P(S.cone, 0x3b4545, 0, HY + 0.3, -0.12, 0.72, 1.3, 0.72); P(S.sph, 0x3b4545, 0, 1.45, -0.32, 0.62, 0.9, 0.3); }
+  if (look.pot) { P(S.ring, 0xd9c7a0, 0, HY + 0.47, 0, 0.32, 0.32, 0.8, Math.PI / 2); P(S.cyl, 0xb5734e, 0, HY + 0.82, 0, 0.42, 0.55, 0.42); P(S.ring, 0x8f5a3a, 0, HY + 1.1, 0, 0.3, 0.3, 0.6, Math.PI / 2); }
+  if (look.apron) { P(new THREE.CylinderGeometry(0.6, 0.67, 0.95, 16, 1, true, -0.95, 1.9), 0xf0e6d0, 0, 0.98, 0.02); P(S.sph, 0xf3ece0, 0, HY + 0.42, 0, 0.42, 0.24, 0.42); }
+  if (role === 'mother') P(S.ring, 0x8a4f6a, 0, 1.86, 0, 0.5, 0.5, 1.4, Math.PI / 2 - 0.15);
+  if (role === 'rebel') P(S.ring, 0xa4443a, 0, HY + 0.18, 0, HR * 1.02, HR * 1.02, 0.6, Math.PI / 2);
+  if (role === 'wanderer') { P(S.box, 0x6d4a32, 0, 1.45, -0.58, 0.7, 0.8, 0.35); P(S.cyl, 0x8f6a50, 0, 1.92, -0.58, 0.18, 0.75, 0.18, 0, 0, Math.PI / 2); }
+  if (role === 'keeper') P(S.sph, 0x5f7f43, 0, 1.4, -0.36, 0.66, 0.95, 0.24);
+  if (child) P(S.box, 0x8f6a50, 0.42, 1.0, 0.1, 0.22, 0.26, 0.12);
+  const bodyMesh = new THREE.Mesh(bakeParts(parts), vmat); bodyMesh.castShadow = true; body.add(bodyMesh);
+  // legs (they swing when walking)
+  const legs = [];
+  for (const sx of [-1, 1]) {
+    const piv = new THREE.Group(); piv.position.set(sx * 0.24, 0.95, 0); body.add(piv);
+    const lm = new THREE.Mesh(bakeParts([[S.cap, trouser, 0, -0.42, 0, 0.17, 0.32, 0.17], [S.sph, 0x4a3a33, 0, -0.86, 0.07, 0.2, 0.14, 0.3]]), vmat);
+    lm.castShadow = true; piv.add(lm); legs.push(piv);
+  }
+  // arms
   const arms = [];
   for (const sx of [-1, 1]) {
-    const piv = new THREE.Group(); piv.position.set(sx * 0.66, 1.72, 0); body.add(piv);
-    const a = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.62, 4, 8), mat(look.col)); a.position.y = -0.42; a.castShadow = true; piv.add(a);
-    const h = new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 6), skin); h.position.y = -0.86; piv.add(h);
+    const piv = new THREE.Group(); piv.position.set(sx * 0.62, 1.78, 0); body.add(piv);
+    const ap = [[S.cap, cloth, 0, -0.36, 0, 0.17, 0.28, 0.17], [S.ring, trim, 0, -0.66, 0, 0.15, 0.15, 0.5, Math.PI / 2], [S.sph, skinHex, 0, -0.8, 0, 0.15, 0.16, 0.14], [S.sphLo, skinHex, sx * -0.1, -0.74, 0.08, 0.05, 0.08, 0.05]];
+    if (sx === -1 && (role === 'elder' || role === 'keeper')) ap.push([S.cyl, 0x6f5238, 0, -1.0, 0.18, 0.06, 2.6, 0.06, 0.35]);
+    const am = new THREE.Mesh(bakeParts(ap), vmat); am.castShadow = true; piv.add(am);
     piv.rotation.z = sx * 0.12; arms.push(piv);
     if (sx === 1) {
       const torch = new THREE.Group(); torch.visible = false; piv.add(torch);
@@ -1797,7 +1875,7 @@ function makeVillagerMesh(role) {
   }
   g.scale.setScalar((look.scale || 1) * 1.15);
   scene.add(g);
-  return { g, body, head, arms, torch: arms[1].userData.torch };
+  return { g, body, head: bodyMesh, arms, legs, torch: arms[1].userData.torch };
 }
 
 const CAST = [
@@ -1917,6 +1995,9 @@ function glyphHTML(id, misfitIds, script) {
   else if (w.guess) { label = w.guess + '?'; cls = 'guess'; }
   return `<span class="g${misfitIds && misfitIds.has(id) ? ' misfit' : ''}"><img src="${GLYPH[id]}" alt=""><small class="${cls}">${label}</small></span>`;
 }
+LINES.H1 = { r: ['please', 'home'], en: 'Please... home? Put me home?', k: 'honest' };
+LINES.H2 = { r: ['afraid', 'afraid', 'please'], en: 'Afraid, so afraid. Please.', k: 'honest' };
+LINES.H3 = { r: ['big', 'not', 'step', 'please'], en: 'Big one, please, do not drop me.', k: 'honest' };
 const lineUnderstood = (line, script) => line.r.every(id => id === 'name' ? nameUnsealed : (words[id].locked && (!script || scriptW[id].locked)));
 function lineHTML(line, misfitIds, script) {
   return `<div class="row">${line.r.map(id => glyphHTML(id, misfitIds, script)).join('')}</div>` + (lineUnderstood(line, script) ? `<div class="full">“${line.en}”</div>` : '');
@@ -1931,7 +2012,7 @@ function placeName(v) {
   if (Math.abs(v.x - riverX(v.z)) < 20) return 'the river';
   const dv = hyp(v.x - VC.x, v.z - VC.z);
   if (dv < 15) return 'the plaza';
-  if (dv < 42) return 'among the houses';
+  if (dv < 80) return 'among the houses';
   if (hyp(v.x - SHRINE.x, v.z - SHRINE.z) < 40) return 'the shrine hill';
   return 'the meadow';
 }
@@ -2182,6 +2263,7 @@ function brain(v) {
     case 'builder': {
       const broken = houses.find(h => h.crushed);
       if (broken) { v.target = broken.door; v.activity = 'rebuilding a home'; v.rebuilding = broken; }
+      else if (village.site) { const B = BUILDS.find(b => b.id === village.site.id); if (newTask || !v.target || hyp(v.target.x - B.at.x, v.target.z - B.at.z) > 12) { v.target = { x: B.at.x + rand(-5, 5), z: B.at.z + 6 + rand(-2, 2) }; v.taskT = rand(6, 10); } v.activity = `building ${B.name}`; v.rebuilding = null; }
       else if (newTask) { const h = pick(houses); v.target = { x: h.door.x, z: h.door.z }; v.taskT = rand(8, 14); v.activity = 'checking the homes'; v.rebuilding = null; }
       break;
     }
@@ -2215,7 +2297,7 @@ function updateVillager(v, dt) {
   if (v.sleeping) { v.mesh.g.position.set(v.x, height(v.x, v.z) + 0.45, v.z); v.mesh.g.rotation.set(-Math.PI / 2, v.yaw, 0, 'YXZ'); return; }
   if (v.riding) {
     v.speakCd -= dt;
-    if (v.speakCd <= 0 && bubbles.length < 4) { say(v, pick([LINES.C3, LINES.C5, LINES.C3, LINES.C4]), false, false); v.speakCd = rand(6, 11); }
+    if (v.speakCd <= 0 && bubbles.length < 4) { say(v, v.role === 'child' ? pick([LINES.C3, LINES.C5, LINES.C3, LINES.C4]) : v.trust > 60 && v.fear < 40 ? pick([LINES.G1, LINES.S1]) : pick([LINES.H1, LINES.H2, LINES.H3]), false, false); v.speakCd = rand(6, 11); }
     return;
   }
   // movement
@@ -2277,6 +2359,7 @@ function updateVillager(v, dt) {
     else if ((v.state === 'watch' || (v.role === 'child' && d < 40 && sp < 1)) && v.fear < 30) { rx = -2.8; rz = 0.3 + Math.sin(gameTime * 9 + v.i) * 0.35; }
     aL.rotation.x = lerp(aL.rotation.x, lx, dt * 8); aR.rotation.x = lerp(aR.rotation.x, rx, dt * 8);
     aL.rotation.z = lerp(aL.rotation.z, lz, dt * 8); aR.rotation.z = lerp(aR.rotation.z, rz, dt * 8);
+    if (m.legs) { const ls = Math.sin(v.walkPh) * Math.min(sp / 4, 1.1) * 0.7; m.legs[0].rotation.x = lerp(m.legs[0].rotation.x, -ls - v.crouch * 0.9, dt * 10); m.legs[1].rotation.x = lerp(m.legs[1].rotation.x, ls - v.crouch * 0.9, dt * 10); }
   }
   // speech
   v.speakCd -= dt;
@@ -2341,31 +2424,97 @@ function treeNear() {
 }
 function actionHint() {
   if (!giant.model || giant.pourT > 0 || (ending && ending.kind !== 'leave')) return '';
-  if (PIM.riding && !giant.carry) return '<kbd>F</kbd> Set Pim down gently';
+  if (giant.reach || giant.throwA || giant.squeeze) return '';
+  if (giant.held && !giant.carry) return `<kbd>F</kbd> Set ${giant.held.name} down gently` + (isAdult(giant.held) ? ' &nbsp; <kbd>Q</kbd> Crush' : '');
   if (tabletNear() && !nameUnsealed && !giant.carry) return '<kbd>F</kbd> Read the carving';
   if (giant.carry === 'boulder') return '<kbd>F</kbd> Set the boulder down';
   if (giant.carry === 'water') return '<kbd>F</kbd> Pour the water in front of you';
   if (giant.carry === 'fruit') return '<kbd>F</kbd> Set the fruit down in front of you';
   if (!giant.carry && brokenHomeNear()) return '<kbd>F</kbd> Help rebuild their home';
+  { const B = !giant.carry && siteHelpT <= 0 && siteNear(); if (B) return `<kbd>F</kbd> Help them build ${B.name}`; }
   if (!giant.carry && boulderNear()) return '<kbd>F</kbd> Lift the boulder';
+  { const v = !giant.carry && villagerNear(); if (v) return `<kbd>F</kbd> Pick up ${v.name}`; }
   if (riverNear()) return '<kbd>F</kbd> Scoop up water';
   if (treeNear()) return '<kbd>F</kbd> Pick fruit from the tree';
   return '';
 }
 function useAction() {
   const G = giant;
-  if (!G.model || G.pourT > 0 || paused || (ending && ending.kind !== 'leave')) return;
-  if (PIM.riding && !G.carry) { setPimDown(); return; }
+  if (!G.model || G.pourT > 0 || G.reach || G.throwA || G.squeeze || paused || (ending && ending.kind !== 'leave')) return;
+  if (G.held && !G.carry) { startReach('low', () => putDown()); return; }
   if (tabletNear() && !nameUnsealed && !G.carry) { readTablet(); return; }
-  if (G.carry === 'boulder') { dropBoulder(); return; }
+  if (G.carry === 'boulder') { startReach('low', () => dropBoulder()); return; }
   if (G.carry === 'water') { G.pourKind = 'water'; G.pourT = 1.6; G.pourDone = false; G.pourAt = frontPoint(15); G.carry = null; return; }
-  if (G.carry === 'fruit') { G.carry = null; G.pourKind = 'fruit'; G.pourT = 0.7; G.pourDone = true; dropFruit(frontPoint(14)); return; }
+  if (G.carry === 'fruit') { startReach('low', () => { G.carry = null; dropFruit(frontPoint(13)); }); return; }
   const bh = brokenHomeNear(); if (bh) { helpRebuild(bh); return; }
-  const bd = boulderNear(); if (bd) { liftBoulder(bd); return; }
+  if (siteHelpT <= 0 && siteNear()) { startReach('low', () => helpBuild()); return; }
+  const bd = boulderNear(); if (bd) { startReach('low', () => liftBoulder(bd)); return; }
+  const vn = villagerNear(); if (vn) { startReach('low', () => tryPickUp(vn)); return; }
   const rp = riverNear();
-  if (rp) { G.carry = 'water'; burst(rp.x, WATER_Y, rp.z, 22, 'splash'); sfxStep(true, true); think('scoop', 'Cool water from the river. Their fields look so dry.'); return; }
+  if (rp) { startReach('low', () => { G.carry = 'water'; const h = handsAt(); burst(h.x, Math.max(WATER_Y, h.y - 1), h.z, 26, 'splash'); sfxStep(true, true); think('scoop', 'Cool water from the river. Their fields look so dry.'); }); return; }
   const t = treeNear();
-  if (t) { G.carry = 'fruit'; setTreeFruit(t, false); burst(t.x, t.top, t.z, 24, 'leaf'); sfxStep(true, false); think('pickfruit', 'Fruit from my trees. I will give them a gift back.'); }
+  if (t) { startReach('high', () => { G.carry = 'fruit'; setTreeFruit(t, false); burst(t.x, t.top, t.z, 24, 'leaf'); sfxStep(true, false); think('pickfruit', 'Fruit from my trees. I will give them a gift back.'); }); }
+}
+// the giant's hands: reach down or up, grab at the halfway point, then bring it back
+function startReach(kind, fn) { giant.reach = { kind, fn, t: 0, dur: kind === 'high' ? 1.0 : 1.15, done: false }; }
+function handsAt() {
+  const M = giant.model; M.root.updateMatrixWorld(true);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(); M.palm.getWorldPosition(a); M.palmL.getWorldPosition(b);
+  return a.add(b).multiplyScalar(0.5);
+}
+function villagerNear() {
+  const p = frontPoint(giant.kneeling ? 9 : 11);
+  let best = null, bd = 8;
+  for (const v of villagers) {
+    if (v.dead || v.hidden || v.sleeping || v.riding || v.leaving) continue;
+    const d = hyp(v.x - p.x, v.z - p.z); if (d < bd) { bd = d; best = v; }
+  }
+  return best;
+}
+function pickUp(v) {
+  v.riding = true; giant.held = v; v.state = 'ride'; v.target = null; v.vx = v.vz = 0; v.diveT = 0;
+  v.activity = v === PIM ? 'riding in your hand' : 'held in your hand'; v.speakCd = 1.2;
+  if (v.inHouse) { v.inHouse.occupants.delete(v); v.inHouse = null; }
+}
+function tryPickUp(v) {
+  const p = frontPoint(giant.kneeling ? 9 : 11);
+  if (v.dead || v.hidden || v.riding || hyp(v.x - p.x, v.z - p.z) > 11) { think('slipped', 'They slipped out from under my fingers.'); return; }
+  pickUp(v);
+  const calm = v.role === 'child' ? v.trust > 45 && v.fear < 40 : v.trust >= 65 && v.fear < 30;
+  if (calm) { v.trust = Math.min(100, v.trust + 2); think('lift-calm', `${v.name} sat in my palm and did not scream. They trust me.`); }
+  else {
+    v.fear = Math.min(100, v.fear + (v.role === 'child' ? 25 : 40)); v.trust = Math.max(0, v.trust - 4);
+    for (const o of villagers) if (o !== v && hyp(o.x - v.x, o.z - v.z) < 70) { o.fear = Math.min(100, o.fear + 10); addAnger(o, 3); }
+    think('lift-scared', `I picked ${v.name} up. They are shaking in my hand.`);
+  }
+  journal(v, 'the giant picked me up in its hand'); journalNear(v.x, v.z, 120, `the giant snatched ${v.name} up in its hand`, v);
+  burst(v.x, height(v.x, v.z), v.z, 6, 'dust');
+}
+function putDown() {
+  const v = giant.held; if (!v) return;
+  const p = frontPoint(giant.kneeling ? 8 : 10);
+  v.riding = false; giant.held = null; v.x = p.x; v.z = p.z; v.state = 'idle'; v.target = null; v.taskT = 0; v.thinkT = 0;
+  v.mesh.g.rotation.set(0, v.yaw, 0);
+  if (v === PIM) PIM.trust = Math.min(100, PIM.trust + 10);
+  else { v.trust = Math.min(100, v.trust + 4); v.fear = Math.max(0, v.fear - 10); journal(v, 'the giant set me down gently'); }
+  burst(p.x, height(p.x, p.z), p.z, 5, 'dust');
+}
+function setPimDown() { putDown(); }
+function updateHeld() {
+  const v = giant.held; if (!v) return;
+  if (v.dead || !v.riding) { giant.held = null; return; }
+  const M = giant.model; M.root.updateMatrixWorld(true);
+  M.palm.getWorldPosition(_fw);
+  v.x = _fw.x; v.z = _fw.z; _fw.y += 0.9; v.ry = _fw.y;
+  v.mesh.g.position.copy(_fw); v.mesh.g.rotation.set(0, giant.yaw, 0);
+  if (v === PIM) v.fear = Math.max(0, v.fear - 0.03);
+}
+// Q while holding someone: close the hand. Never a child.
+function crushHeld() {
+  const v = giant.held;
+  if (v.role === 'child') { think('nochild-hand', 'Not the child. My hand will never close on the child.', true); return; }
+  if (smiteCd > 0) return;
+  smiteCd = 5; giant.squeeze = { t: 0, dur: 1.1, v, done: false };
 }
 function applyWater(x, z) {
   burst(x, height(x, z) + 0.5, z, 30, 'splash');
@@ -2429,6 +2578,7 @@ function footstep(fx, fz) {
   shake = Math.min(1.6, shake + (light ? 0.3 : 0.85));
   burst(fx, Math.max(fy, wet ? WATER_Y : fy), fz, light ? 5 : 12, wet ? 'splash' : 'dust');
   sfxStep(light, wet);
+  if (!light && !loading) stompSite(fx, fz);
   for (const h of houses) {
     if (h.crushed) continue;
     const d = hyp(fx - h.x, fz - h.z);
@@ -2537,41 +2687,71 @@ function findTarget() {
 }
 function smite() {
   if (!started || paused || ending) return;
-  if (smiteCd > 0) return;
+  if (giant.held) { crushHeld(); return; }
+  if (smiteCd > 0 || giant.throwA || giant.reach) return;
   const v = findTarget();
   if (!v) {
     if (!PIM.hidden && hyp(PIM.x - giant.x, PIM.z - giant.z) < 120) think('nochild', 'Not the child. My hand will never fall on the child.', true);
-    toast('<span>Face an adult villager. The ring shows who the lightning will find.</span>');
+    toast(`<span>Face an adult villager. The ring shows who ${giantKind === 'goddess' ? 'the lightning' : 'your boulder'} will find.</span>`);
     return;
   }
   smiteCd = 5;
-  lightning(v.x, v.z);
-  killVillager(v);
+  if (giantKind === 'goddess') { lightning(v.x, v.z); killVillager(v, 'sky'); }
+  else giant.throwA = { t: 0, dur: 0.8, v, fired: false };
 }
-function killVillager(v) {
+// Oru hurls a boulder: it arcs from his hand and lands where they stand
+const rocks = [];
+const ROCK_GEO = new THREE.IcosahedronGeometry(2.4, 1), ROCK_MAT = mat(0x8f897e, { roughness: 1 });
+function hurlRock(v) {
+  const from = handsAt(); const m = new THREE.Mesh(ROCK_GEO, ROCK_MAT); m.castShadow = true; m.position.copy(from); scene.add(m);
+  const d = hyp(v.x - from.x, v.z - from.z);
+  rocks.push({ m, from: from.clone(), v, t: 0, dur: clamp(d / 70, 0.5, 1.3), peak: 8 + d * 0.18, spin: new THREE.Vector3(rand(-6, 6), rand(-6, 6), rand(-6, 6)), landed: false, life: 0 });
+  sfxStep(false, false);
+}
+function updateRocks(dt) {
+  for (let i = rocks.length - 1; i >= 0; i--) {
+    const r = rocks[i];
+    if (r.landed) { r.life += dt; if (r.life > 40) { r.m.position.y -= dt * 0.6; if (r.life > 44) { scene.remove(r.m); rocks.splice(i, 1); } } continue; }
+    r.t += dt / r.dur; const t = Math.min(1, r.t);
+    const tx = r.v.dead ? r.tx : (r.tx = r.v.x), tz = r.v.dead ? r.tz : (r.tz = r.v.z), ty = height(tx, tz) + 1.6;
+    r.m.position.set(lerp(r.from.x, tx, t), lerp(r.from.y, ty, t) + Math.sin(t * Math.PI) * r.peak, lerp(r.from.z, tz, t));
+    r.m.rotation.x += r.spin.x * dt; r.m.rotation.y += r.spin.y * dt; r.m.rotation.z += r.spin.z * dt;
+    if (t >= 1) {
+      r.landed = true; r.m.position.y = height(tx, tz) + 1.2;
+      burst(tx, height(tx, tz) + 0.5, tz, 34, 'dust'); shake = Math.min(1.8, shake + 0.9); sfxStep(false, false);
+      for (const h of houses) if (!h.crushed && hyp(h.x - tx, h.z - tz) < h.r + 1.5) houseEvent(h, 'crush');
+      if (!r.v.dead && !r.v.riding && hyp(r.v.x - tx, r.v.z - tz) < 7) killVillager(r.v, 'boulder');
+      for (const o of villagers) { const d = hyp(o.x - tx, o.z - tz); if (d < 14 && !o.hidden && !o.riding) { const k = 1 / Math.max(d, 0.5); o.vx = (o.x - tx) * k * 12; o.vz = (o.z - tz) * k * 12; o.diveT = 0.5; o.fear = Math.min(100, o.fear + 30); } }
+    }
+  }
+}
+function killVillager(v, how = 'sky') {
   const justified = gameTime - (v.lastBadT || -999) < 30;
   const idx = villagers.indexOf(v); if (idx >= 0) villagers.splice(idx, 1);
   v.dead = true; fallen.push(v); smiteCount++; if (revoltStage >= 3) smiteRevolt++;
   if (v.inHouse) v.inHouse.occupants.delete(v);
   for (let i = bubbles.length - 1; i >= 0; i--) if (bubbles[i].v === v) { bubbles[i].el.remove(); bubbles.splice(i, 1); }
-  const char = new THREE.MeshStandardMaterial({ color: 0x1b1718, roughness: 1, emissive: new THREE.Color(0xff5a1a), emissiveIntensity: 0.4 });
-  v.mesh.g.traverse(o => { if (o.isMesh) o.material = char; });
+  if (how === 'sky') { const char = new THREE.MeshStandardMaterial({ color: 0x1b1718, roughness: 1, emissive: new THREE.Color(0xff5a1a), emissiveIntensity: 0.4 }); v.mesh.g.traverse(o => { if (o.isMesh) o.material = char; }); }
+  else v.mesh.g.visible = false;
   if (v.mesh.torch) v.mesh.torch.visible = false;
-  corpses.push({ v, t: 0, yaw: v.yaw });
+  if (v.riding) { v.riding = false; if (giant.held === v) giant.held = null; }
+  corpses.push({ v, t: 0, yaw: v.yaw, how });
   onDeath(v);
-  journalNear(v.x, v.z, 220, `the sky struck ${v.name} down while the giant watched${justified ? ' after they spoke against it' : ''}`, v);
+  const what = how === 'hand' ? `the giant crushed ${v.name} in its hand` : how === 'boulder' ? `the giant hurled a boulder and crushed ${v.name}` : `the sky struck ${v.name} down while the giant watched`;
+  journalNear(v.x, v.z, 220, what + (justified ? ' after they spoke against it' : ''), v);
   for (const o of villagers) {
     const d = hyp(o.x - v.x, o.z - v.z);
     const near = o.hidden ? 0.4 : clamp(1 - d / 220, 0.2, 1);
-    o.fear = Math.min(100, o.fear + 50 * near);
-    o.trust = Math.max(0, o.trust - 20 * near);
+    o.fear = Math.min(100, o.fear + (how === 'hand' ? 65 : 50) * near);
+    o.trust = Math.max(0, o.trust - (how === 'hand' ? 30 : 20) * near);
     const friend = o.homeHouse === v.homeHouse || v === OSWEN || v === MARA;
     if (revoltStage >= 3) { o.anger *= 0.82; o.fear = Math.min(100, o.fear + 15 * near); }   // terror breaks a rising
     else addAnger(o, (justified ? 8 : 26) * near + (friend ? 15 : 0));
     o.memory.push({ type: 'smite', t: gameTime, who: v.name, justified });
     o.speakCd = Math.min(o.speakCd, rand(1.5, 4));
   }
-  if (justified) think('smite-just', 'They spoke against me. Now they know what I am.');
+  if (how === 'hand') think('crush-hand', 'I closed my hand. It was so easy. I felt it.', true);
+  else if (justified) think('smite-just', 'They spoke against me. Now they know what I am.');
   else think('smite-innocent', 'What did I just do? That one never said a word against me.');
   if (smiteCount === 3) think('smite3', 'The sky answers me every time. Is this what being a god means?');
   if (villagers.filter(isAdult).length <= 2) setTimeout(() => showEnding('empty'), 3500);
@@ -2579,6 +2759,7 @@ function killVillager(v) {
 function updateCorpses(dt) {
   for (let i = corpses.length - 1; i >= 0; i--) {
     const c = corpses[i]; c.t += dt; const g = c.v.mesh.g;
+    if (c.how !== 'sky') { if (c.t > 3.2) { scene.remove(g); corpses.splice(i, 1); addGrave(c.v); } continue; }
     g.rotation.set(-Math.min(1, c.t / 0.5) * Math.PI / 2, c.yaw, 0, 'YXZ');
     if (Math.random() < dt * 4) puff(g.position.x, g.position.y + 1, g.position.z);
     if (c.t > 3.2) { burst(g.position.x, g.position.y + 0.5, g.position.z, 22, 'ash'); scene.remove(g); corpses.splice(i, 1); addGrave(c.v); }
@@ -2655,16 +2836,16 @@ function hurt(n) {
 }
 
 // ---------- palisade ----------
-const STAKE_N = 56;
+const STAKE_N = 90;
 const stakeMesh = new THREE.InstancedMesh(new THREE.ConeGeometry(0.55, 5.5, 6), mat(0x7a5a3d), STAKE_N);
 stakeMesh.castShadow = true; stakeMesh.count = 0; scene.add(stakeMesh);
 const stakes = []; let stakeBuild = 0, stakeShown = 0;
 {
   const q = new THREE.Quaternion(), sv = new THREE.Vector3(1, 1, 1);
   for (let i = 0; i < STAKE_N; i++) {
-    const a = i / STAKE_N * Math.PI * 2, x = VC.x + Math.cos(a) * 48, z = VC.z + Math.sin(a) * 48;
+    const a = i / STAKE_N * Math.PI * 2, x = VC.x + Math.cos(a) * 86, z = VC.z + Math.sin(a) * 86;
     q.setFromUnitVectors(UP, new THREE.Vector3(Math.cos(a) * 0.55, 1, Math.sin(a) * 0.55).normalize());
-    stakes.push({ x, z, m4: new THREE.Matrix4().compose(new THREE.Vector3(x, height(x, z) + 1.8, z), q.clone(), sv), broken: false });
+    stakes.push({ x, z, m4: new THREE.Matrix4().compose(new THREE.Vector3(x, height(x, z) + 1.8, z), q.clone(), sv), broken: FIELDS.some(f => inField(f, x, z, 2)) || Math.abs(x - riverX(z)) < 12 });
   }
 }
 const ZERO4 = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -2939,7 +3120,7 @@ let giftT = 70;
 const bouquets = [];
 function updateGifts(dt) {
   if (ending || revoltStage > 0 || tyrant) return;
-  giftT -= dt; if (giftT > 0) return; giftT = rand(45, 75);
+  giftT -= dt; if (giftT > 0) return; giftT = has('market') ? rand(28, 48) : rand(45, 75);
   if (phaseOf(tDay) !== 'day') return;
   const ad = villagers.filter(isAdult);
   if (avg(ad, v => v.trust) < 42 || avg(ad, v => v.anger) > 15) return;
@@ -2965,27 +3146,13 @@ function dropGift(v, kind) {
   else { say(v, LINES.P3, false, false); think('tribute', 'They brought it because I told them to. It does not taste the same.'); }
 }
 function updatePim(dt) {
-  if (PIM.riding) {
-    const M = giant.model; M.root.updateMatrixWorld(true);
-    M.palm.getWorldPosition(_fw);
-    PIM.x = _fw.x; PIM.z = _fw.z; PIM.ry = _fw.y;
-    _fw.y += 0.9; PIM.ry = _fw.y;
-    PIM.mesh.g.position.copy(_fw); PIM.mesh.g.rotation.set(0, giant.yaw, 0);
-    PIM.fear = Math.max(0, PIM.fear - dt * 2);
-    return;
-  }
-  if (!ending && pimStage < 2 && stilled() && (giant.stillT > 8 || aspect === 'moss') && (PIM.trust > 60 || (aspect === 'moss' && PIM.trust > 40)) && PIM.fear < 18 && !PIM.hidden && !giant.carry && hyp(PIM.x - giant.x, PIM.z - giant.z) < 34) {
-    PIM.riding = true; PIM.state = 'ride'; PIM.activity = 'riding in your hand'; PIM.vx = PIM.vz = 0;
+  if (PIM.riding) { PIM.fear = Math.max(0, PIM.fear - dt * 2); return; }
+  if (!ending && pimStage < 2 && stilled() && (giant.stillT > 8 || aspect === 'moss') && (PIM.trust > 60 || (aspect === 'moss' && PIM.trust > 40)) && PIM.fear < 18 && !PIM.hidden && !giant.carry && !giant.held && !giant.reach && hyp(PIM.x - giant.x, PIM.z - giant.z) < 34) {
+    pickUp(PIM);
     think('pimride', 'The little one climbed right into my hand. It is not afraid of me at all.');
     toast('<span>Pim climbed into your hand. Press <kbd style="color:var(--ink);border-color:var(--ink)">F</kbd> to set them down gently.</span>');
     PIM.speakCd = 1.5;
   }
-}
-function setPimDown() {
-  const p = frontPoint(9);
-  PIM.riding = false; PIM.x = p.x; PIM.z = p.z; PIM.state = 'idle'; PIM.target = null; PIM.trust = Math.min(100, PIM.trust + 10);
-  PIM.mesh.g.rotation.set(0, PIM.yaw, 0);
-  burst(p.x, height(p.x, p.z), p.z, 4, 'dust');
 }
 
 /* =========================================================
@@ -3067,7 +3234,7 @@ function startLeave() {
   $('#reveal').hidden = true; hideHud(false); paused = false;
   ending = { kind: 'leave', harm: 0, woken: new Set() };
   tDay = 0.8; applySky(tDay); updateEnv();
-  if (PIM.riding) setPimDown();
+  if (giant.held) putDown();
   cutRopes(false);
   for (const s of shots) scene.remove(s.m); shots.length = 0;
   giant.x = 20; giant.z = -100; giant.yaw = 0; giant.kneeling = false; giant.carry = null; giant.speed = 0; camYaw = Math.PI;
@@ -3095,7 +3262,7 @@ function startStay() {
   stowBoulder();
   $('#reveal').hidden = true; hideHud(false); paused = false;
   ending = { kind: 'stay', t: 0 };
-  if (PIM.riding) setPimDown();
+  if (giant.held) putDown();
   cutRopes(false);
   giant.kneeling = true; giant.carry = null;
   think('stay1', 'I will lie down here, and I will never take another step.', true);
@@ -3143,7 +3310,7 @@ function updateStory(dt) {
   updateSwarm(dt); updateHail(dt); updateShaping(dt); updateSeasons(dt); updateAspects(dt); updateGrief(dt); updatePimBond(dt); updateKeeper(dt);
   checkStory();
   processReplies();
-  updatePim(dt);
+  updateHeld(); updatePim(dt); updateRocks(dt); updateGrowth(dt);
   updateGifts(dt);
   updateRevolt(dt);
   updateFires(dt);
@@ -3166,7 +3333,7 @@ function updateStory(dt) {
    ========================================================= */
 const ASPECTS = {
   bloom:   { name: 'Bloom',   how: 'Earned by kindness: feeding, watering, putting out fires.', blurb: 'Flowers grow over you and crops sprout where you walk. They dance for you. But roots crack their floors.' },
-  storm:   { name: 'Storm',   how: 'Earned by wrath: lightning, or homes destroyed.', blurb: 'A crown of cloud and rain that follows you. Fields drink, low homes flood, and everyone hides.' },
+  storm:   { name: 'Storm',   how: 'Earned by wrath: striking them down, or homes destroyed.', blurb: 'A crown of cloud and rain that follows you. Fields drink, low homes flood, and everyone hides.' },
   gilded:  { name: 'Gilded',  how: 'Earned by demanding tribute.', blurb: 'Gold veins and burning eyes. The Priest grows powerful and tribute flows to your feet.' },
   starlit: { name: 'Starlit', how: 'Earned by staying near the village through two nights.', blurb: 'Constellations glow across your skin at night. Someone falls in love with you.' },
   moss:    { name: 'Moss',    how: 'Earned by sitting perfectly still for a long time.', blurb: 'Moss, trees and nesting birds. You cannot move, and it is the only way to be truly loved.' },
@@ -3356,6 +3523,13 @@ function mournLines(v) { return v.memory.find(m => m.type === 'smite'); }
    PIM GROWS UP
    ========================================================= */
 let pimBond = 30, pimStage = 0, pimPath = null;
+// grown-up Pim gets a grown-up body
+function remesh(v) {
+  const old = v.mesh, vis = old.g.visible;
+  scene.remove(old.g); old.g.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+  v.mesh = makeVillagerMesh(v.role); v.mesh.g.visible = vis;
+  v.mesh.g.position.copy(old.g.position); v.mesh.g.rotation.copy(old.g.rotation);
+}
 function updatePimBond(dt) {
   if (PIM.dead) return;
   if (PIM.riding) pimBond = Math.min(100, pimBond + dt * 0.5);
@@ -3373,6 +3547,7 @@ function pimDawn() {
     if (pimPath === 'keeper') { PIM.role = 'keeper'; ROLE_TITLE.keeper = 'Keeper'; PIM.trust = 100; PIM.fear = 0; think('pim-keeper', 'Pim is grown now. Pim is still not afraid of me. Pim never was.'); toast('<span>Pim has grown up to be a <b>Keeper</b>, who will stand between you and the others.</span>'); }
     if (pimPath === 'rebel') { PIM.role = 'rebel'; ROLE_TITLE.rebel = 'Rebel'; PIM.anger = 95; PIM.trust = 0; PIM.grudge = true; think('pim-rebel', 'Pim is grown now. And Pim hates me. I taught Pim that.'); toast('<span>Pim has grown up to be a <b>Rebel</b>, and the village listens to them.</span>'); }
     if (pimPath === 'wanderer') { PIM.role = 'wanderer'; ROLE_TITLE.wanderer = 'Wanderer'; PIM.leaving = true; think('pim-wander', 'Pim walked toward the northern pass this morning.'); toast('<span>Pim has grown up and is leaving the valley to see the world.</span>'); }
+    remesh(PIM);
   }
 }
 function pimBrain(v) {
@@ -3579,7 +3754,7 @@ function boulderNear() {
 }
 function liftBoulder(b) {
   b.carried = true; giant.carry = 'boulder'; giant.boulder = b;
-  scene.remove(b.mesh); giant.model.carry.add(b.mesh); b.mesh.position.set(0, 1, 0);
+  scene.remove(b.mesh); giant.model.carry.add(b.mesh); b.mesh.position.set(0, b.r * 0.75, 0);
   burst(b.x, height(b.x, b.z), b.z, 14, 'dust');
   think('boulder', 'A stone that would take all of them a lifetime to move. It weighs nothing to me.');
 }
@@ -3712,7 +3887,7 @@ function updateSeasons(dt) {
   if (season === 'spring') { blossomT -= dt; if (blossomT <= 0) { blossomT = 0.08; const t = pick(TREES); if (hyp(t.x - giant.x, t.z - giant.z) < 160) burst(t.x + rand(-2, 2), t.top - 1, t.z + rand(-2, 2), 1, 'petal'); } }
   if (season === 'autumn') { leafT -= dt; if (leafT <= 0) { leafT = 0.07; const t = pick(TREES); if (hyp(t.x - giant.x, t.z - giant.z) < 160) burst(t.x + rand(-2, 2), t.top - 1, t.z + rand(-2, 2), 1, 'autumnleaf'); } }
   // the season's pull on the village
-  if (season === 'winter') { for (const v of villagers) if (!v.fed || gameTime - v.fed > 120) v.hunger = Math.min(100, (v.hunger || 0) + dt * 0.25); }
+  if (season === 'winter') { for (const v of villagers) if (!v.fed || gameTime - v.fed > 120) v.hunger = Math.min(100, (v.hunger || 0) + dt * (has('granary') ? 0.12 : 0.25)); }
   else for (const v of villagers) v.hunger = Math.max(0, (v.hunger || 0) - dt * 0.5);
   const hungry = villagers.filter(v => (v.hunger || 0) > 50);
   if (hungry.length >= 4) { think('winter-hunger' + dayNum, 'They are hungry. The stores are nearly empty and the trees are bare.'); for (const v of hungry) addAnger(v, dt * 0.12); }
@@ -3807,7 +3982,7 @@ function snapshot() {
     v: 1, kind: giantKind, day: dayNum, t: tDay, gameTime, season,
     words: W(words), script: W(scriptW), sealedSeen, scriptActive, tablet: !!tablet, nameUnsealed,
     dead: fallen.map(v => v.name), gone: (PIM.gone ? ['Pim'] : []).concat(village.departed),
-    village: { log: village.log, rumors: village.rumors, visits: village.visits, departed: village.departed },
+    village: { log: village.log, rumors: village.rumors, visits: village.visits, departed: village.departed, built: village.built, site: village.site },
     vill: villagers.map(v => ({ n: v.name, x: +v.x.toFixed(1), z: +v.z.toFixed(1), f: v.fear | 0, tr: v.trust | 0, a: v.anger | 0, g: !!v.grudge, gf: v.grudgeFor || null, h: v.hunger | 0, j: v.journal || [] })),
     houses: houses.map(h => ({ c: h.crushed, f: +(h.flood || 0).toFixed(2) })),
     stats: { homesLost, smiteCount, smiteRevolt, giftsReceived, kindness, tributes, nightsNear, pain: pain | 0, tyrant, stakeBuild },
@@ -3857,7 +4032,7 @@ function restore(S) {
   homesLost = st.homesLost; smiteCount = st.smiteCount; smiteRevolt = st.smiteRevolt; giftsReceived = st.giftsReceived; kindness = st.kindness; tributes = st.tributes; nightsNear = st.nightsNear; pain = st.pain;
   stakeBuild = st.stakeBuild || 0; refreshStakes();
   for (const s of S.vill) { const v = byName(s.n); if (!v || v.dead) continue; v.x = s.x; v.z = s.z; v.fear = s.f; v.trust = s.tr; v.anger = s.a; v.grudge = s.g; v.grudgeFor = s.gf; v.hunger = s.h; v.journal = s.j || []; v.memory.length = 0; }
-  if (S.village) { village.log = S.village.log || []; village.rumors = S.village.rumors || []; Object.assign(village.visits, S.village.visits || {}); village.departed = S.village.departed || []; }
+  if (S.village) { village.log = S.village.log || []; village.rumors = S.village.rumors || []; Object.assign(village.visits, S.village.visits || {}); village.departed = S.village.departed || []; restoreGrowth(S.village); }
   pimBond = S.pim.pimBond; pimStage = 0;
   if (S.pim.pimStage >= 1) { const d = dayNum; dayNum = 3; pimDawn(); dayNum = d; }
   if (S.pim.pimStage >= 2) { const d = dayNum; dayNum = 4; pimDawn(); dayNum = d; }
@@ -3996,7 +4171,7 @@ function rulesCouncil() {
   let dissent = null;
   const harsh = plans.findIndex(p => p.type === 'ambush' || p.type === 'lure' || p.type === 'exodus');
   if (harsh >= 0) { const d = byTrust.find(v => v.trust > 45 && v.anger < 20 && !v.grudge && !plans[harsh].members.includes(v.name)); if (d && Math.random() < 0.7) dissent = { name: d.name, plan: harsh }; }
-  const rumor = smiteCount > 0 && A > 30 ? 'The sky strikes whoever the giant looks at.' : kindness > 4 ? 'The giant feeds us when we are hungry.' : null;
+  const rumor = smiteCount > 0 && A > 30 ? (giantKind === 'goddess' ? 'The sky strikes whoever the giant looks at.' : 'Its stones find whoever it looks at.') : kindness > 4 ? 'The giant feeds us when we are hungry.' : null;
   return { plans: plans.slice(0, 2), dissent, rumor, note: 'The village decided by instinct.' };
 }
 
@@ -4204,7 +4379,7 @@ function updatePlans(dt) {
         break;
       }
       case 'watch': {
-        if (NIGHT > 0.3 && dG(VC) < 75 && !p.warned) { p.warned = true; const s = members[0]; if (s) say(s, LINES.SW, false, false); for (const v of villagers) if (!v.hidden && v.planId !== p.id) v.fear = Math.min(100, v.fear + 35); think('sentry', 'A lookout shouted when I came near. They are watching for me now.'); }
+        if (NIGHT > 0.3 && dG(VC) < (has("tower") ? 150 : 100) && !p.warned) { p.warned = true; const s = members[0]; if (s) say(s, LINES.SW, false, false); for (const v of villagers) if (!v.hidden && v.planId !== p.id) v.fear = Math.min(100, v.fear + 35); think('sentry', 'A lookout shouted when I came near. They are watching for me now.'); }
         if (tDay < 0.5 || tDay > w1) finishPlan(p, true, p.warned ? 'our lookouts warned everyone' : 'the night passed quietly');
         break;
       }
@@ -4261,7 +4436,7 @@ function swarmBrain(v) {
     }
     case 'lure': v.state = 'lurk'; v.target = { x: p.spot.x + Math.cos(a) * 26, z: p.spot.z + Math.sin(a) * 26 }; v.activity = 'watching the bait from hiding'; return true;
     case 'exodus': if (v.spotted) { v.state = 'home'; v.target = homeOf(v).door; v.activity = 'running home, caught'; return true; } v.state = 'exodus'; v.target = { x: PASS.x + i * 2, z: PASS.z }; v.activity = 'sneaking toward the pass'; return true;
-    case 'watch': if (NIGHT > 0.2) { const ang = Math.atan2(giant.z - VC.z, giant.x - VC.x) + (i ? 0.6 : -0.6); v.state = 'sentry'; v.target = { x: VC.x + Math.cos(ang) * 46, z: VC.z + Math.sin(ang) * 46 }; v.activity = 'keeping watch for you'; return true; } return false;
+    case 'watch': if (NIGHT > 0.2) { const ang = Math.atan2(giant.z - VC.z, giant.x - VC.x) + (i ? 0.6 : -0.6); v.state = 'sentry'; v.target = { x: VC.x + Math.cos(ang) * 80, z: VC.z + Math.sin(ang) * 80 }; v.activity = 'keeping watch for you'; return true; } return false;
     case 'hide_children': if (v === WREN || i === 0) { if (!v.hidden) { v.state = 'home'; v.target = HALL.door; v.activity = 'hiding the children'; } return true; } return false;
   }
   return false;
@@ -4480,6 +4655,179 @@ if (matchMedia('(pointer: coarse)').matches) { $('#how-touch').hidden = false; $
 document.querySelectorAll('.pick').forEach(b => b.addEventListener('click', () => start(b.dataset.kind)));
 $('#continue').addEventListener('click', () => { const S = store.get(SAVE_KEY); if (S) start(S.kind, S); });
 renderTitle();
+/* =========================================================
+   THE VILLAGE GROWS: they build new things when life is good (or fear makes them)
+   ========================================================= */
+const siteAt = (deg, r) => { const a = deg * Math.PI / 180; return { x: VC.x + Math.cos(a) * r, z: VC.z + Math.sin(a) * r }; };
+const BUILDS = [
+  { id: 'tower', name: 'a watchtower', at: siteAt(270, 56), fear: true, ok: T => smiteCount > 0 || revoltStage >= 1 || T.fear >= 45,
+    done: 'They built a watchtower. Now they can see me coming from far away.', effect: 'Lookouts spot you from much farther at night.' },
+  { id: 'granary', name: 'a granary', at: siteAt(20, 56), ok: T => T.trust >= 30 && T.anger < 30,
+    done: 'A granary. They are storing food for the winter. They think they will be here for it.', effect: 'Winter hunger comes on half as fast.' },
+  { id: 'market', name: 'market stalls', at: siteAt(190, 32), ok: T => T.trust >= 45 && giftsReceived >= 1,
+    done: 'Market stalls in the plaza. They trade with each other now, and laugh more.', effect: 'They bring you gifts more often.' },
+  { id: 'mill', name: 'a waterwheel', at: { x: riverX(62) - 15, z: 62 }, ok: T => T.trust >= 45 && FIELDS.some(f => f.irrigated || f.wet > 0.5),
+    done: 'A waterwheel on the river. It turns all day, and the fields stay wet.', effect: 'Fields dry out half as fast.' },
+  { id: 'lanterns', name: 'lanterns for the lanes', at: siteAt(180, 52), ok: T => T.trust >= 55,
+    done: 'Lanterns along every lane. At night the village glows like a little sky.', effect: 'The lanes glow at night.' },
+  { id: 'statue', name: 'a statue of you', at: siteAt(90, 28), ok: T => T.trust >= 65 && smiteCount === 0 && homesLost <= 1,
+    done: 'A statue. Of me. They carved me out of stone, and they put flowers at its feet.', effect: 'The village warms to you a little every day.' },
+];
+village.built = []; village.site = null;
+const buildGroups = {};
+let siteHelpT = 0, lanternMats = [];
+function buildingMesh(id) {
+  const g = new THREE.Group(), wood = mat(0x7a5a3d), stone = mat(0xa49f92), thatch = mat(0xd6b25c, { roughness: 1 });
+  const add = (geo, m, x, y, z, rx = 0, ry = 0, rz = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
+  if (id === 'granary') {
+    add(new THREE.CylinderGeometry(4.4, 4.8, 1.4, 18), stone, 0, 0.7, 0);
+    add(new THREE.CylinderGeometry(3.7, 3.9, 5.5, 18), mat(0xb88a5a), 0, 4.1, 0);
+    for (const y of [2.4, 4.4, 6.2]) add(new THREE.TorusGeometry(3.85, 0.14, 6, 24), wood, 0, y, 0, Math.PI / 2);
+    add(new THREE.ConeGeometry(5.0, 3.8, 18), thatch, 0, 8.7, 0);
+    add(new THREE.BoxGeometry(1.4, 1.8, 0.3), mat(0x4a3a33), 0, 4.6, 3.85);
+    for (const sx of [-0.6, 0.6]) add(new THREE.CylinderGeometry(0.1, 0.1, 5.2, 5), wood, sx, 2.4, 4.6, -0.25);
+  } else if (id === 'market') {
+    const cols = [0xc9493c, 0x2f6f74, 0xd9a441];
+    for (let i = 0; i < 3; i++) {
+      const x = (i - 1) * 6.5, c = mat(cols[i]), cw = mat(0xf1ead9);
+      for (const [px, pz] of [[-2, -1.6], [2, -1.6], [-2, 1.6], [2, 1.6]]) add(new THREE.CylinderGeometry(0.13, 0.13, 3.6, 6), wood, x + px, 1.8, pz);
+      for (let k = 0; k < 4; k++) add(new THREE.BoxGeometry(1.15, 0.12, 4.0), k % 2 ? cw : c, x - 1.73 + k * 1.15, 3.75, 0, 0.12);
+      add(new THREE.BoxGeometry(4.0, 0.3, 2.6), wood, x, 1.4, 0);
+      for (let k = 0; k < 4; k++) add(new THREE.SphereGeometry(0.38, 10, 8), mat(pick([0xe0803a, 0xd8b040, 0x8fb06a, 0xd9a35a])), x - 1.2 + k * 0.8, 1.8, rand(-0.5, 0.5));
+    }
+  } else if (id === 'statue') {
+    add(new THREE.BoxGeometry(5.2, 1.8, 5.2), stone, 0, 0.9, 0);
+    const st = mat(0xc9c3b4, { roughness: 0.7 }), accent = mat(giantKind === 'goddess' ? 0x5b4a8a : 0xa4443a);
+    add(new THREE.CylinderGeometry(1.0, 1.8, 5.2, 14), giantKind === 'goddess' ? accent : st, 0, 4.4, 0);
+    add(new THREE.SphereGeometry(1.25, 14, 10), st, 0, 7.1, 0, 0, 0, 0).scale.set(1.15, 0.9, 0.9);
+    add(new THREE.SphereGeometry(0.95, 14, 10), st, 0, 8.5, 0);
+    for (const sx of [-1, 1]) add(new THREE.CapsuleGeometry(0.32, 2.6, 4, 8), st, sx * 1.5, 6.0, 0.3, -0.35, 0, sx * 0.25);
+    if (giantKind === 'goddess') add(new THREE.TorusGeometry(0.75, 0.12, 6, 18), mat(0xd9a441, { metalness: 0.6, roughness: 0.3 }), 0, 9.1, 0, Math.PI / 2 - 0.2);
+    else add(new THREE.ConeGeometry(1.4, 3.6, 12), accent, 0, 5.2, -0.9, 0.15);
+    for (let k = 0; k < 6; k++) add(new THREE.IcosahedronGeometry(0.32, 0), mat(pick([0xf1b7c8, 0xf4e3a0, 0xf6f0e6, 0xa98bc9])), rand(-2, 2), 1.95, 2.0 + rand(0, 0.6));
+  } else if (id === 'tower') {
+    for (const [px, pz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) add(new THREE.CylinderGeometry(0.28, 0.36, 13, 6), wood, px, 6.5, pz, px * -0.012, 0, pz * 0.012);
+    add(new THREE.BoxGeometry(5.4, 0.5, 5.4), wood, 0, 11, 0);
+    for (const [px, pz, ry] of [[0, 2.6, 0], [0, -2.6, 0], [2.6, 0, Math.PI / 2], [-2.6, 0, Math.PI / 2]]) add(new THREE.BoxGeometry(5.4, 1.1, 0.18), wood, px, 11.8, pz, 0, ry);
+    add(new THREE.ConeGeometry(4.0, 2.6, 4), thatch, 0, 14.4, 0, 0, Math.PI / 4);
+    for (const sx of [-0.5, 0.5]) add(new THREE.CylinderGeometry(0.09, 0.09, 11.5, 5), wood, sx, 5.6, 2.9, -0.18);
+  } else if (id === 'mill') {
+    add(new THREE.BoxGeometry(6, 5, 5), mat(0xb88a5a), 0, 2.5, 0);
+    add(new THREE.ConeGeometry(5.2, 3, 4), thatch, 0, 6.5, 0, 0, Math.PI / 4);
+    const wheel = new THREE.Group(); wheel.position.set(4.4, 3.4, 0); g.add(wheel);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.25, 6, 24), wood); rim.rotation.y = Math.PI / 2; wheel.add(rim);
+    for (let k = 0; k < 8; k++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.25, 6.6, 0.7), wood); sp.rotation.x = k * Math.PI / 8; wheel.add(sp); }
+    wheel.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    g.userData.wheel = wheel;
+  } else if (id === 'lanterns') {
+    add(new THREE.BoxGeometry(3, 0.4, 2), wood, 0, 0.2, 0);
+    for (let k = 0; k < 3; k++) add(new THREE.CylinderGeometry(0.12, 0.12, 4.5, 5), wood, -1 + k, 0.6, 0, 0, 0, Math.PI / 2);
+  }
+  return g;
+}
+function lanternPosts() {
+  const g = new THREE.Group(), wood = mat(0x5e4430);
+  const glow = new THREE.MeshStandardMaterial({ color: 0xffe2a8, emissive: new THREE.Color(0xffb84d), emissiveIntensity: 0 });
+  lanternMats.push(glow);
+  for (const h of houses) {
+    const mx = (h.door.x + VC.x) / 2 + (h.door.z - VC.z) * 0.06, mz = (h.door.z + VC.z) / 2 - (h.door.x - VC.x) * 0.06;
+    for (const [x, z] of [[mx, mz], [h.door.x + (VC.x - h.door.x) * 0.15 + 2.5, h.door.z + (VC.z - h.door.z) * 0.15]]) {
+      const y = height(x, z);
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 4.2, 5), wood); p.position.set(x, y + 2.1, z); p.castShadow = true; g.add(p);
+      const l = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 8), glow); l.position.set(x, y + 4.4, z); g.add(l);
+    }
+  }
+  scene.add(g); return g;
+}
+function placeBuilding(id, progress) {
+  const B = BUILDS.find(b => b.id === id); if (!B) return;
+  let e = buildGroups[id];
+  if (!e) {
+    const g = buildingMesh(id); g.position.set(B.at.x, height(B.at.x, B.at.z) - 0.1, B.at.z);
+    g.rotation.y = id === 'mill' ? 0 : Math.atan2(VC.x - B.at.x, VC.z - B.at.z);
+    scene.add(g);
+    const sc = new THREE.Group(), wood = mat(0x8f6a50);
+    for (const [px, pz] of [[-4.5, -4.5], [4.5, -4.5], [-4.5, 4.5], [4.5, 4.5]]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 8, 5), wood); p.position.set(px, 4, pz); p.castShadow = true; sc.add(p); }
+    for (const y of [2.5, 5.5]) for (const [px, pz, ry] of [[0, -4.5, 0], [0, 4.5, 0], [-4.5, 0, Math.PI / 2], [4.5, 0, Math.PI / 2]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(9, 0.2, 0.2), wood); b.position.set(px, y, pz); b.rotation.y = ry; sc.add(b); }
+    for (let k = 0; k < 6; k++) { const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.7, 0), mat(0xa49f92)); r.position.set(6 + rand(-1, 1), 0.5, rand(-2, 2)); r.castShadow = true; sc.add(r); }
+    sc.position.copy(g.position); sc.rotation.y = g.rotation.y; scene.add(sc);
+    e = buildGroups[id] = { g, sc, lanterns: null };
+  }
+  const p = clamp(progress, 0, 1);
+  e.g.scale.set(1, 0.08 + 0.92 * p, 1);
+  e.sc.visible = p < 1;
+  if (p >= 1 && id === 'lanterns' && !e.lanterns) e.lanterns = lanternPosts();
+}
+const has = id => village.built.includes(id);
+function villageMoodAvg() {
+  const ad = villagers.filter(v => !v.dead && isAdult(v));
+  return { trust: avg(ad, v => v.trust), fear: avg(ad, v => v.fear), anger: avg(ad, v => v.anger || 0) };
+}
+function startNextBuilding() {
+  if (village.site || ending || dayNum < 2 || revoltStage >= 2 || DOV.dead) return;
+  const T = villageMoodAvg();
+  const B = BUILDS.find(b => !has(b.id) && b.ok(T));
+  if (!B) return;
+  village.site = { id: B.id, p: 0, helped: false };
+  placeBuilding(B.id, 0);
+  toast(`<span>The village has started building <b>${B.name}</b>. Dov is in charge.</span>`);
+  think('build-' + B.id, B.fear ? 'They are building something tall at the edge of the village. To watch me.' : 'They are building something new. The village is growing.');
+  journalAll(`we started building ${B.name}`); villageLog(`started building ${B.name}`);
+}
+function finishBuilding(id) {
+  const B = BUILDS.find(b => b.id === id);
+  village.built.push(id); village.site = null; placeBuilding(id, 1);
+  burst(B.at.x, height(B.at.x, B.at.z) + 3, B.at.z, 30, 'petal');
+  toast(`<span>They finished <b>${B.name}</b>. ${B.effect}</span>`);
+  think('built-' + id, B.done);
+  journalAll(`we finished building ${B.name}`); villageLog(`finished ${B.name}`);
+  for (const v of villagers) if (!v.hidden && hyp(v.x - B.at.x, v.z - B.at.z) < 60 && v.fear < 50) v.singT = gameTime + 15;
+  if (tDay < 0.45) startNextBuilding();
+}
+function siteNear() {
+  const S = village.site; if (!S) return null;
+  const B = BUILDS.find(b => b.id === S.id), p = frontPoint(14);
+  return hyp(B.at.x - p.x, B.at.z - p.z) < 16 ? B : null;
+}
+function helpBuild() {
+  const S = village.site, B = siteNear(); if (!S || !B) return;
+  S.p = Math.min(1, S.p + 0.45); S.helped = true; siteHelpT = 20; kindness++;
+  burst(B.at.x, height(B.at.x, B.at.z) + 2, B.at.z, 22, 'dust');
+  for (const v of villagers) if (hyp(v.x - B.at.x, v.z - B.at.z) < 110) { v.trust = Math.min(100, v.trust + 6); addAnger(v, -6); }
+  think('helpbuild', 'I lifted the heavy beams for them. They cheered. They actually cheered.');
+  journalAll(`the giant helped us build ${B.name}`);
+  placeBuilding(S.id, S.p);
+  if (S.p >= 1) finishBuilding(S.id);
+}
+function stompSite(fx, fz) {
+  const S = village.site; if (!S) return;
+  const B = BUILDS.find(b => b.id === S.id);
+  if (hyp(B.at.x - fx, B.at.z - fz) > 9 || S.p <= 0.05) return;
+  S.p = Math.max(0, S.p - 0.35); placeBuilding(S.id, S.p);
+  burst(B.at.x, height(B.at.x, B.at.z) + 2, B.at.z, 26, 'debris');
+  for (const v of villagers) if (hyp(v.x - B.at.x, v.z - B.at.z) < 110) addAnger(v, v === DOV ? 14 : 6);
+  think('stompsite', `I stepped right on their ${B.name.replace(/^an? /, '')}. Days of work.`);
+  journalAll(`the giant trampled the ${B.name.replace(/^an? /, '')} we were building`);
+}
+function updateGrowth(dt) {
+  siteHelpT = Math.max(0, siteHelpT - dt);
+  for (const m of lanternMats) m.emissiveIntensity = NIGHT * 2.2;
+  const mill = buildGroups.mill; if (mill && has('mill')) mill.g.userData.wheel.rotation.x += dt * 0.8;
+  if (has('statue')) for (const v of villagers) if (!v.grudge && v.trust < 60 && hyp(v.x - VC.x, v.z - VC.z) < 90) v.trust += dt * 0.01;
+  const S = village.site; if (!S || ending) return;
+  const ph = phaseOf(tDay); if (ph !== 'day' && ph !== 'dawn') return;
+  const B = BUILDS.find(b => b.id === S.id);
+  const atSite = !DOV.dead && !DOV.hidden && hyp(DOV.x - B.at.x, DOV.z - B.at.z) < 14;
+  S.p = Math.min(1, S.p + dt / (DAY_LEN * 0.5) * (atSite ? 1 : 0.3));
+  placeBuilding(S.id, S.p);
+  if (S.p >= 1) finishBuilding(S.id);
+}
+function restoreGrowth(V) {
+  village.built = (V && V.built) || []; village.site = (V && V.site) || null;
+  for (const id of village.built) placeBuilding(id, 1);
+  if (village.site) placeBuilding(village.site.id, village.site.p);
+}
+
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
 window.addEventListener('pagehide', () => saveGame(true));
 
@@ -4487,6 +4835,7 @@ window.addEventListener('pagehide', () => saveGame(true));
    MAIN LOOP
    ========================================================= */
 const footW = new THREE.Vector3();
+const _hA = new THREE.Vector3(), _hB = new THREE.Vector3();
 let prevPhaseKey = '';
 function updateGiant(dt) {
   const G = giant, M = G.model;
@@ -4508,7 +4857,7 @@ function updateGiant(dt) {
   let mx = fx * iz + rx * ix, mz = fz * iz + rz * ix;
   const ml = hyp(mx, mz);
   const moving = ml > 0.15 && !G.kneeling;
-  const targetSpeed = moving ? (G.light ? 5 : 10.5) * Math.min(1, il) * (G.carry ? 0.8 : 1) * (G.roped > 0 ? 0.3 : 1) : 0;
+  const targetSpeed = moving ? (G.light ? 5 : 10.5) * Math.min(1, il) * (G.carry ? 0.8 : 1) * (G.roped > 0 ? 0.3 : 1) * (G.reach || G.throwA || G.squeeze ? 0.25 : 1) : 0;
   G.speed = lerp(G.speed, targetSpeed, dt * 3);
   if (moving) { mx /= ml; mz /= ml; G.yaw = angLerp(G.yaw, Math.atan2(mx, mz), dt * 3.2); }
   const f = giantForward();
@@ -4530,14 +4879,51 @@ function updateGiant(dt) {
   M.AL.sh.rotation.x = -s * 0.32 * mv - k * 0.45; M.AR.sh.rotation.x = s * 0.32 * mv - k * 0.45;
   M.AL.el.rotation.x = -0.25 - k * 0.6; M.AR.el.rotation.x = -0.25 - k * 0.6;
   M.AL.sh.rotation.z = -0.06 - k * 0.1; M.AR.sh.rotation.z = 0.06 + k * 0.1;
-  if (G.carry || G.pourT > 0) {
-    const pour = G.pourT > 0 ? Math.sin(Math.min(1, (1.6 - G.pourT) / 0.5) * Math.PI / 2) : 0;
-    for (const A of [M.AL, M.AR]) { A.sh.rotation.x = -1.2 - pour * 0.35 - k * 0.2; A.el.rotation.x = -0.55; }
-    M.AL.sh.rotation.z = 0.32; M.AR.sh.rotation.z = -0.32;
-    M.carry.rotation.x = pour * 1.1;
-    M.carry.position.y = 9.5 + pour * 1.5;
+  // hands ease into the carry pose instead of snapping
+  G.hold = lerp(G.hold || 0, (G.carry || G.pourT > 0) ? 1 : 0, dt * 5);
+  G.cradle = lerp(G.cradle || 0, G.held && !G.carry ? 1 : 0, dt * 5);
+  const pour = G.pourT > 0 && G.pourKind === 'water' ? Math.sin(Math.min(1, (1.6 - G.pourT) / 0.5) * Math.PI / 2) : 0;
+  if (G.hold > 0.001) {
+    const hb = G.hold;
+    for (const A of [M.AL, M.AR]) { A.sh.rotation.x = lerp(A.sh.rotation.x, -1.2 - pour * 0.45 - k * 0.2, hb); A.el.rotation.x = lerp(A.el.rotation.x, -0.55 + pour * 0.35, hb); }
+    M.AL.sh.rotation.z = lerp(M.AL.sh.rotation.z, 0.3, hb); M.AR.sh.rotation.z = lerp(M.AR.sh.rotation.z, -0.3, hb);
   }
-  if (PIM.riding && !G.carry && !(G.pourT > 0)) { M.AR.sh.rotation.x = -0.95 - k * 0.15; M.AR.el.rotation.x = -1.05; M.AR.sh.rotation.z = -0.12; }
+  M.carry.rotation.x = pour * 1.2;
+  if (G.cradle > 0.001) { const c2 = G.cradle; M.AR.sh.rotation.x = lerp(M.AR.sh.rotation.x, -0.95 - k * 0.15, c2); M.AR.el.rotation.x = lerp(M.AR.el.rotation.x, -1.05, c2); M.AR.sh.rotation.z = lerp(M.AR.sh.rotation.z, -0.12, c2); }
+  G.bend = 0;
+  if (G.reach) {
+    const R = G.reach; R.t += dt; const p = Math.min(1, R.t / R.dur);
+    const e = p < 0.5 ? smooth(0, 0.5, p) : 1 - smooth(0.5, 1, p);
+    const low = R.kind !== 'high';
+    for (const A of [M.AL, M.AR]) { A.sh.rotation.x = lerp(A.sh.rotation.x, low ? -0.8 - k * 0.3 : -2.35, e); A.el.rotation.x = lerp(A.el.rotation.x, low ? -0.12 : -0.2, e); }
+    M.AL.sh.rotation.z = lerp(M.AL.sh.rotation.z, 0.18, e); M.AR.sh.rotation.z = lerp(M.AR.sh.rotation.z, -0.18, e);
+    if (low) { const sq = e * (1 - k); M.L.knee.rotation.x += sq * 1.0; M.R.knee.rotation.x += sq * 1.0; M.L.hip.rotation.x -= sq * 0.6; M.R.hip.rotation.x -= sq * 0.6; G.bend = e; }
+    if (p >= 0.5 && !R.done) { R.done = true; if (R.fn) R.fn(); }
+    if (p >= 1) G.reach = null;
+  }
+  if (G.throwA) {
+    const T = G.throwA; T.t += dt; const p = Math.min(1, T.t / T.dur);
+    const wind = smooth(0, 0.45, p), fling = smooth(0.45, 0.62, p), back = smooth(0.7, 1, p);
+    M.AR.sh.rotation.x = lerp(lerp(lerp(M.AR.sh.rotation.x, -2.9, wind), -0.7, fling), M.AR.sh.rotation.x, back);
+    M.AR.el.rotation.x = lerp(lerp(M.AR.el.rotation.x, -1.3, wind), -0.15, fling);
+    G.twist = (wind - fling) * 0.35;
+    if (p >= 0.56 && !T.fired) { T.fired = true; if (!T.v.dead) hurlRock(T.v); }
+    if (p >= 1) { G.throwA = null; G.twist = 0; }
+  }
+  if (G.squeeze) {
+    const Q = G.squeeze; Q.t += dt; const p = Math.min(1, Q.t / Q.dur);
+    const up = smooth(0, 0.45, p) * (1 - smooth(0.8, 1, p));
+    M.AR.sh.rotation.x = lerp(M.AR.sh.rotation.x, -1.75, up); M.AR.el.rotation.x = lerp(M.AR.el.rotation.x, -1.35, up);
+    if (p > 0.45 && p < 0.65) M.AR.el.rotation.z = Math.sin(Q.t * 60) * 0.04;
+    if (p >= 0.6 && !Q.done) {
+      Q.done = true; M.AR.el.rotation.z = 0;
+      const v = Q.v; const h = new THREE.Vector3(); M.root.updateMatrixWorld(true); M.palm.getWorldPosition(h);
+      burst(h.x, h.y, h.z, 28, 'dust'); burst(h.x, h.y, h.z, 10, 'petal'); shake = Math.min(1.8, shake + 0.6);
+      if (AC && soundOn) noiseBurst(AC.currentTime, 0.25, 500, 0.3, 'lowpass', 1);
+      if (!v.dead) killVillager(v, 'hand');
+    }
+    if (p >= 1) G.squeeze = null;
+  }
   M.water.visible = G.carry === 'water' || (G.pourT > 0.35 && G.pourKind === 'water');
   M.fruit.visible = G.carry === 'fruit';
   if (G.pourT > 0) {
@@ -4546,15 +4932,23 @@ function updateGiant(dt) {
       M.root.updateMatrixWorld(true);
       const cw = new THREE.Vector3(); M.carry.getWorldPosition(cw);
       burst(cw.x + rand(-1.5, 1.5), cw.y - 2, cw.z + rand(-1.5, 1.5), 3, 'pour');
-      M.water.scale.setScalar(Math.max(0.1, (G.pourT - 0.35) / 1.25)); M.water.scale.y *= 0.7;
+      M.water.scale.setScalar(Math.max(0.1, (G.pourT - 0.35) / 1.25)); M.water.scale.y *= 0.55;
     }
     if (!G.pourDone && G.pourT < 0.6) { G.pourDone = true; if (G.pourKind === 'water') applyWater(G.pourAt.x, G.pourAt.z); }
-    if (G.pourT <= 0) { G.pourT = 0; M.water.scale.set(1, 0.7, 1); M.carry.rotation.x = 0; M.carry.position.y = 9.5; }
+    if (G.pourT <= 0) { G.pourT = 0; M.water.scale.set(1, 0.55, 1); M.carry.rotation.x = 0; }
   }
   M.pelvis.position.y = M.hipY - Math.abs(s) * 0.7 * mv - k * M.kneelDrop;
   if (M.cape) M.cape.rotation.x = 0.06 + 0.42 * G.moveAmt * (1 - k) + Math.sin(gameTime * 1.7) * 0.025 - k * 0.2;
-  M.torso.rotation.x = 0.04 * mv + k * 0.22;
-  M.torso.rotation.y = s * 0.05 * mv;
+  M.torso.rotation.x = 0.04 * mv + k * 0.22 + G.bend * 0.5 * (1 - k) + G.bend * 0.25 * k;
+  M.torso.rotation.y = s * 0.05 * mv + (G.twist || 0);
+  M.pelvis.position.y -= G.bend * M.kneelDrop * 0.4 * (1 - k);
+  // whatever the hands hold sits between the palms, so it rises and dips with them
+  if (G.carry || G.pourT > 0) {
+    M.root.updateMatrixWorld(true);
+    M.palm.getWorldPosition(_hA); M.palmL.getWorldPosition(_hB); _hA.add(_hB).multiplyScalar(0.5);
+    M.torso.worldToLocal(_hA); M.carry.position.copy(_hA);
+    if (G.carry === 'water') { M.water.scale.x = 1 + Math.sin(gameTime * 7) * 0.03; M.water.scale.z = 1 + Math.cos(gameTime * 6) * 0.03; if (G.speed > 2 && Math.random() < dt * 3) { const w = new THREE.Vector3(); M.carry.getWorldPosition(w); burst(w.x + rand(-1.5, 1.5), w.y - 1, w.z + rand(-1.5, 1.5), 1, 'pour'); } }
+  }
   if (shapeAnim > 0) { const a = Math.sin(shapeAnim / 0.45 * Math.PI); for (const A of [M.AL, M.AR]) { A.sh.rotation.x = -0.35 - 0.85 * a; A.el.rotation.x = -0.35; } M.torso.rotation.x += 0.38 * a; }
   M.neck.rotation.x = -k * 0.15 + Math.sin(gameTime * 0.6) * 0.02;
   M.head.rotation.y = Math.sin(gameTime * 0.25) * 0.15 * (1 - mv);
@@ -4600,6 +4994,7 @@ function updateCamera(dt) {
   camera.position.set(cx + rand(-sh, sh), cy + rand(-sh, sh), cz + rand(-sh, sh));
   const lx = tx - Math.sin(camYaw) * 30, lz = tz - Math.cos(camYaw) * 30;
   camera.lookAt(lx, tgtY - lerp(8, 10, k) - camPitch * 6, lz);
+  if (window.__ggCam) { const c = window.__ggCam; camera.position.set(c[0], c[1], c[2]); camera.lookAt(c[3], c[4], c[5]); }  // test views only
 }
 let introYaw = 0;
 function updateIntroCamera(dt) {
@@ -4617,7 +5012,7 @@ function updateWorld(dt) {
   if (ph !== prevPhaseKey) {
     if (ph === 'dusk') { if (funeral) think('funeral-' + funeral.name, `They are not singing for me tonight. They are burying ${funeral.name}.`, true); else think('dusk', 'They are gathering in the plaza. They sing for me every night.'); }
     if (ph === 'night') { think('night', 'They all go inside at night. I wish they would not hide from me.'); if (hyp(giant.x - VC.x, giant.z - VC.z) < 150) nightsNear++; if (funeral) funeral = null; for (const v of villagers) v.mournAt = null; }
-    if (ph === 'dawn') { pimDawn(); for (const gr of graves) if (gr.flowers < 3 && villagers.some(v => kinOf({ name: gr.name, homeHouse: null }).has(v.name) || v.grudgeFor === gr.name)) { gr.flowers++; const f = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 0), mat(pick([0xf1b7c8, 0xf4e3a0, 0xf6f0e6]))); f.position.set(gr.x + rand(-1.2, 1.2), height(gr.x, gr.z) + 0.4, gr.z + 1.5 + rand(-0.6, 0.6)); scene.add(f); } }
+    if (ph === 'dawn') { pimDawn(); startNextBuilding(); for (const gr of graves) if (gr.flowers < 3 && villagers.some(v => kinOf({ name: gr.name, homeHouse: null }).has(v.name) || v.grudgeFor === gr.name)) { gr.flowers++; const f = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 0), mat(pick([0xf1b7c8, 0xf4e3a0, 0xf6f0e6]))); f.position.set(gr.x + rand(-1.2, 1.2), height(gr.x, gr.z) + 0.4, gr.z + 1.5 + rand(-0.6, 0.6)); scene.add(f); } }
     if (ph === 'day' && prevPhaseKey === 'dawn' && dayNum > 1 && basket.visible) think('day' + dayNum, `Day ${dayNum}. The bread is still there at the stone.`);
     if (ph === 'dusk' && basket.visible) basket.visible = false;
     prevPhaseKey = ph;
@@ -4637,7 +5032,7 @@ function updateWorld(dt) {
     }
   }
   for (const f of FIELDS) {
-    if (f.wet > 0) f.wet = Math.max(0, f.wet - dt / 240);
+    if (f.wet > 0) f.wet = Math.max(0, f.wet - dt / (has('mill') ? 480 : 240));
     const w = f.wet; f.mesh.material.color.setRGB(lerp(1, 0.62, w), lerp(1, 0.86, w), lerp(1, 0.5, w));
   }
   for (const h of houses) if (h.flood > 0) { h.flood = Math.max(0, h.flood - dt / 120); h.wallsMat.color.copy(h.baseWall).multiplyScalar(1 - 0.42 * h.flood); }
@@ -4761,7 +5156,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // test hook (used only by automated checks)
-window.__gg = { giant, villagers, words, houses, heardLog, LINES, start: begin, footstep, get tDay() { return tDay; }, set tDay(v) { tDay = v; }, get gameTime() { return gameTime; }, lockedCount, keys, useAction, village, rulesCouncil, requestCouncil, startCouncil, cleanPlans, councilPayload, startPlan, giantAsksPeace, saveGame, snapshot, get season() { return season; }, get weather() { return weather; }, setSeason, rollWeather, recordEnding, renderTitle, applyEdit, shape, boulders, liftBoulder, dropBoulder, helpRebuild, editAt, earnAspect, setAspect, get aspect() { return aspect; }, graves, get pim() { return { pimBond, pimStage, pimPath }; }, set pimBondV(v) { pimBond = v; }, pimDawn, set dayN(v) { dayNum = v; }, get dayN() { return dayNum; }, piles, FIELDS, TREES, smite, killVillager, openSpeak, interpret, startReveal, startLeave, startStay, readTablet, scriptW, get state() { return { revoltStage, tyrant, pain, smiteCount, scriptActive, nameUnsealed, tablet: !!tablet, ending, unrest: unrest(), giftsReceived, homesLost }; }, setTalk(r) { sentence = r; }, doSpeak, findTarget, unrest, cam(y, p, z) { camYaw = y; camPitch = p; camZoom = z; },
+window.__gg = { startNextBuilding, finishBuilding, helpBuild, stompSite, BUILDS, giant, villagers, words, houses, heardLog, LINES, start: begin, footstep, get tDay() { return tDay; }, set tDay(v) { tDay = v; }, get gameTime() { return gameTime; }, lockedCount, keys, useAction, village, rulesCouncil, requestCouncil, startCouncil, cleanPlans, councilPayload, startPlan, giantAsksPeace, saveGame, snapshot, get season() { return season; }, get weather() { return weather; }, setSeason, rollWeather, recordEnding, renderTitle, applyEdit, shape, boulders, liftBoulder, dropBoulder, helpRebuild, editAt, earnAspect, setAspect, get aspect() { return aspect; }, graves, get pim() { return { pimBond, pimStage, pimPath }; }, set pimBondV(v) { pimBond = v; }, pimDawn, set dayN(v) { dayNum = v; }, get dayN() { return dayNum; }, piles, FIELDS, TREES, smite, killVillager, openSpeak, interpret, startReveal, startLeave, startStay, readTablet, scriptW, get state() { return { revoltStage, tyrant, pain, smiteCount, scriptActive, nameUnsealed, tablet: !!tablet, ending, unrest: unrest(), giftsReceived, homesLost }; }, setTalk(r) { sentence = r; }, doSpeak, findTarget, unrest, cam(y, p, z) { camYaw = y; camPitch = p; camZoom = z; },
   sim(sec) { for (let t = 0; t < sec; t += 0.05) { updateGiant(0.05); updateWorld(0.05); updateMono(0.05); updateBubbles(0.05); } } };
 })();
 </script>
