@@ -210,6 +210,9 @@ body.touch #monologue { bottom: calc(200px + env(safe-area-inset-bottom, 0px)); 
 body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { display: none !important; }
 #epi-cap { position: fixed; left: 50%; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(720px, calc(100% - 32px)); text-align: center; z-index: 17; font-family: var(--font-display); font-size: clamp(20px, 3vw, 30px); color: var(--bone); text-shadow: 0 2px 18px rgba(20,16,30,.9); opacity: 0; transition: opacity 1.2s; pointer-events: none; text-wrap: balance; }
 #epi-cap.on { opacity: 1; }
+#travel { position: fixed; inset: 0; z-index: 18; display: grid; place-items: center; background: rgba(18,14,28,.55); padding: 24px 16px; }
+#fade { position: fixed; inset: 0; z-index: 30; background: #120e1c; opacity: 0; pointer-events: none; transition: opacity .35s; }
+#fade.on { opacity: 1; }
 #vm-council { position: fixed; inset: 0; z-index: 18; display: grid; place-items: center; background: rgba(18,14,28,.6); padding: 24px 16px; }
 .vmc-opts { display: grid; gap: 8px; }
 .vmc-opts button { text-align: left; border: 2px solid var(--ink); background: transparent; color: var(--ink); border-radius: 12px; padding: 10px 14px; font-weight: 800; }
@@ -240,6 +243,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 <div class="hud chip" id="act" hidden></div>
 <div class="hud" id="hud-help" hidden>
   <b>Walk</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp; <b>Look</b> drag the mouse<br>
+  <b>Run</b> hold <kbd>Space</kbd> &nbsp; <b>Travel</b> <kbd>M</kbd><br>
   <b>Tread lightly</b> hold <kbd>Shift</kbd> to step over huts &nbsp; <b>Kneel</b> <kbd>E</kbd><br>
   <b>Scoop water, pick fruit, lift someone, set down</b> <kbd>F</kbd><br>
   <b>Speak</b> <kbd>T</kbd> &nbsp; <b>Smite</b> <kbd>Q</kbd> at the ringed villager<br>
@@ -254,6 +258,8 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 <div id="touch" hidden>
   <div id="stick"><div id="knob"></div></div>
   <div id="tbtns">
+    <button type="button" id="t-run">Run</button>
+    <button type="button" id="t-travel">Travel</button>
     <button type="button" id="t-light">Tread lightly</button>
     <button type="button" id="t-speak">Speak</button>
     <button type="button" id="t-smite">Smite</button>
@@ -268,7 +274,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
 
 <section id="start" aria-labelledby="title">
   <div class="start-inner">
-    <div class="build">Playable build 0.13</div>
+    <div class="build">Playable build 0.14</div>
     <h1 id="title">Gentle Giant</h1>
     <p class="tag">They sing for you every night. Learn what they're singing.</p>
     <button class="continue" type="button" id="continue" hidden><b>Continue</b><span id="continue-sub"></span></button>
@@ -310,7 +316,7 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
     </div>
     <div class="nb-cols">
       <div><h3>Words you've seen</h3><div class="words" id="nb-words"></div><div id="nb-script"></div></div>
-      <div><h3>What you've heard</h3><div class="heard" id="nb-heard"></div><div id="nb-plans"></div><div id="nb-fallen"></div></div>
+      <div><h3>What you've heard</h3><div class="heard" id="nb-heard"></div><div id="nb-plans"></div><div id="nb-secrets"></div><div id="nb-fallen"></div></div>
     </div>
   </div>
 </section>
@@ -338,6 +344,17 @@ body.cine .hud, body.cine #touch, body.cine #reticle, body.cine #bubbles { displ
     </div>
   </div>
 </section>
+
+<section id="travel" hidden aria-labelledby="travel-title">
+  <div class="end-inner">
+    <div class="build" style="color:#8a6a22">Travel</div>
+    <h2 id="travel-title">Where to?</h2>
+    <p>A few long strides and you're there. You'll arrive standing clear of their homes.</p>
+    <div class="vmc-opts" id="travel-opts"></div>
+    <div class="end-actions"><button class="btn-ghost" type="button" id="travel-close">Never mind</button></div>
+  </div>
+</section>
+<div id="fade" aria-hidden="true"></div>
 
 <section id="vm-council" hidden aria-labelledby="vmc-title">
   <div class="end-inner">
@@ -1589,7 +1606,7 @@ for (const id of Object.keys(ROOTS)) GLYPH[id] = drawGlyph(id, id === 'name' ? '
 
 // their secret script: a different, randomly drawn mark for every word, new each playthrough
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const SCRIPT_SEED = Math.floor(Math.random() * 1e9);
+let SCRIPT_SEED = Math.floor(Math.random() * 1e9);
 function drawScript(i, ink) {
   const c = document.createElement('canvas'); c.width = c.height = 96;
   const x = c.getContext('2d'); x.scale(1.5, 1.5);
@@ -1605,6 +1622,37 @@ function drawScript(i, ink) {
 }
 const SCRIPT_GLYPH = {};
 Object.keys(ROOTS).forEach((id, i) => { SCRIPT_GLYPH[id] = drawScript(i, '#3d2b52'); });
+
+// a fresh language every new game: which picture means what, how each word sounds,
+// the order they put words in, and the order things are listed in your notebook
+let LANG = null;
+const BASE_SOUND = {}; for (const id of ROOT_IDS) BASE_SOUND[id] = { syl: ROOTS[id].syl, pitch: ROOTS[id].pitch };
+function shuffledBy(arr, R) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function makeLanguage(seed, classic) {
+  const R = mulberry(seed), same = Object.fromEntries(ROOT_IDS.map(id => [id, id]));
+  const sh = shuffledBy(ROOT_IDS, R), so = shuffledBy(ROOT_IDS, R);
+  return { seed, classic: !!classic,
+    shape: classic ? same : Object.fromEntries(ROOT_IDS.map((id, i) => [id, sh[i]])),
+    sound: classic ? same : Object.fromEntries(ROOT_IDS.map((id, i) => [id, so[i]])),
+    order: shuffledBy(ROOT_IDS, R), menu: shuffledBy(ROOT_IDS, R), grammar: classic ? 0 : 1 + Math.floor(R() * 3) };
+}
+function applyLanguage(L) {
+  LANG = L;
+  for (const id of ROOT_IDS) { GLYPH[id] = drawGlyph(L.shape[id], '#2b2233'); const b = BASE_SOUND[L.sound[id]]; ROOTS[id].syl = b.syl; ROOTS[id].pitch = b.pitch; }
+  MEANINGS.splice(0, MEANINGS.length, ...L.menu.map(id => ROOTS[id].en));
+  SCRIPT_SEED = (L.seed * 31 + 7) | 0;
+  Object.keys(ROOTS).forEach((id, i) => { SCRIPT_GLYPH[id] = drawScript(i, '#3d2b52'); });
+}
+// their grammar: the glyphs come out in their own order, not English order
+const LEADERS = ['not', 'please'];
+function speechOrder(r) {
+  const g = LANG ? LANG.grammar : 0;
+  if (g === 1) return r.slice().reverse();                                        // backwards
+  if (g === 2) { const a = r.filter(id => !LEADERS.includes(id)), b = r.filter(id => LEADERS.includes(id)); return a.concat(b); }   // no and please come last
+  if (g === 3) return r.length > 1 ? r.slice(1).concat(r[0]) : r.slice();        // the first word goes last
+  return r;
+}
+const GRAMMAR_NOTE = ['', 'They seem to say things backwards.', 'Their \u201cno\u201d and \u201cplease\u201d come at the very end.', 'The most important word comes last.'];
 
 // kind: pub (said when they think you're watching), priv (said when they think you aren't), honest (children say it anyway)
 const LINES = {
@@ -2046,9 +2094,10 @@ LINES.AS2 = { r: ['name', 'go', 'sun'], en: 'Our great one goes with me, past th
 LINES.H1 = { r: ['please', 'home'], en: 'Please... home? Put me home?', k: 'honest' };
 LINES.H2 = { r: ['afraid', 'afraid', 'please'], en: 'Afraid, so afraid. Please.', k: 'honest' };
 LINES.H3 = { r: ['big', 'not', 'step', 'please'], en: 'Big one, please, do not drop me.', k: 'honest' };
+for (const id in LINES) LINES[id].id = id;
 const lineUnderstood = (line, script) => line.r.every(id => id === 'name' ? nameUnsealed : (words[id].locked && (!script || scriptW[id].locked)));
 function lineHTML(line, misfitIds, script) {
-  return `<div class="row">${line.r.map(id => glyphHTML(id, misfitIds, script)).join('')}</div>` + (lineUnderstood(line, script) ? `<div class="full">“${line.en}”</div>` : '');
+  return `<div class="row">${speechOrder(line.r).map(id => glyphHTML(id, misfitIds, script)).join('')}</div>` + (lineUnderstood(line, script) ? `<div class="full">“${line.en}”</div>` : '');
 }
 function placeName(v) {
   const dg = hyp(v.x - giant.x, v.z - giant.z);
@@ -2085,6 +2134,7 @@ function say(v, line, whisper, forceScript) {
   }
   const dist = hyp(v.x - giant.x, v.z - giant.z);
   heardLog.unshift({ line, who: v, role: v.role, place: placeName(v), when: `Day ${dayNum}, ${phaseLabel(tDay).toLowerCase()}`, activity: v.activity, whisper, script });
+  if (v.secret) checkSecrets();
   if (heardLog.length > 60) heardLog.pop();
   const el = document.createElement('div');
   el.className = 'bubble' + (whisper ? ' whisper' : '') + (line.bad && lineUnderstood(line, script) ? ' bad' : '');
@@ -2099,7 +2149,7 @@ function say(v, line, whisper, forceScript) {
   if (line.bad && lineUnderstood(line, script)) think('badline', 'They speak against me. I could make them stop. I could make them all stop.');
 }
 function lockWord(id) {
-  const w = words[id]; w.locked = true; w.misfit = null;
+  const w = words[id]; w.locked = true; w.misfit = null; setTimeout(checkSecrets, 0);
   toast(`<img src="${GLYPH[id]}" alt=""><span>You understand a word: <span class="en">${ROOTS[id].en}</span></span>`);
   sfxLock();
   const n = lockedCount();
@@ -2110,6 +2160,7 @@ function lockWord(id) {
   if (!$('#notebook').hidden) renderNotebook();
 }
 function lockScript(id) {
+  setTimeout(checkSecrets, 0);
   const w = scriptW[id]; w.locked = true; w.misfit = null;
   toast(`<img src="${SCRIPT_GLYPH[id]}" alt=""><span>You cracked a script mark: <span class="en">${ROOTS[id].en}</span></span>`);
   sfxLock();
@@ -2146,6 +2197,7 @@ function chooseLine(v, watched) {
   const ph = phaseOf(tDay), f = v.fear, pool = [];
   const push = (id, w = 1) => { for (let i = 0; i < w; i++) pool.push(id); };
   if (v.visitor) { for (const id of v.visitor.lines) push(id); return LINES[pick(pool)]; }
+  { const sl = secretLine(v, watched); if (sl) return sl; }
   const recentCrush = v.memory.some(m => m.type === 'crush' && gameTime - m.t < 90);
   const recentFlood = v.memory.some(m => m.type === 'flood' && gameTime - m.t < 90);
   const recentGift = v.memory.some(m => m.type === 'gift' && gameTime - m.t < 90);
@@ -2620,6 +2672,7 @@ function takeFruit(v, pile) {
   if (v === PIM) pimBond = Math.min(100, pimBond + 5);
   journal(v, 'I ate fruit the giant left for us');
   pile.n--; v.trust = Math.min(100, v.trust + 8); v.fear = Math.max(0, v.fear - 6); v.fed = gameTime; addAnger(v, -12);
+  if (v.secret === 'hungry' && !v.secretFed && hyp(pile.x - homeOf(v).x, pile.z - homeOf(v).z) < 60) { v.secretFed = true; v.trust = Math.min(100, v.trust + 25); v.hunger = 0; journal(v, 'the giant brought food to my hungry family'); think('fed-secret', `${v.name} took the fruit home to their children. They looked back at me and bowed.`, true); }
   const kid = pile.mesh.children[pile.n]; if (kid) kid.visible = false;
   if (pile.n <= 0) { scene.remove(pile.mesh); piles.splice(piles.indexOf(pile), 1); }
   v.speakCd = Math.min(v.speakCd, 0.6); v.taskT = 0; v.target = null; v.state = 'idle';
@@ -2999,8 +3052,8 @@ function updateRevolt(dt) {
    ========================================================= */
 let speakMode = null, sentence = [];
 const giantSpeaker = { name: 'You', role: 'giant', get x() { return giant.x; }, get z() { return giant.z; }, bubbleY: () => height(giant.x, giant.z) + lerp(54, 38, giant.kneel) };
-function knownWords() { const w = ROOT_IDS.filter(id => words[id].locked); if (nameUnsealed) w.push('name'); return w; }
-function giantLineHTML(r) { return `<div class="row">${r.map(id => `<span class="g"><img src="${GLYPH[id]}" alt=""><small>${id === 'name' ? 'their name' : ROOTS[id].en}</small></span>`).join('')}</div>`; }
+function knownWords() { const w = (LANG ? LANG.menu : ROOT_IDS).filter(id => words[id].locked); if (nameUnsealed) w.push('name'); return w; }
+function giantLineHTML(r) { return `<div class="row">${speechOrder(r).map(id => `<span class="g"><img src="${GLYPH[id]}" alt=""><small>${id === 'name' ? 'their name' : ROOTS[id].en}</small></span>`).join('')}</div>`; }
 function openSpeak(mode = 'talk') {
   if (!started || (ending && mode !== 'final')) return;
   const kw = knownWords();
@@ -3280,7 +3333,7 @@ function startReveal() {
   const last = list.length - 1;
   list.forEach((h, i) => setTimeout(() => {
     const d = document.createElement('div'); d.className = 'rev-line';
-    d.innerHTML = `<div class="row">${h.line.r.map(id => `<img src="${GLYPH[id]}" alt="">`).join('')}</div><div><div class="who">${h.who === PIM ? 'Pim · the first thing anyone ever said to you' : h.unheard ? 'Whispered when you were not listening' : ROLE_TITLE[h.who.role] + ' ' + h.who.name}</div><div class="en">“${h.line.en}”</div></div>`;
+    d.innerHTML = `<div class="row">${speechOrder(h.line.r).map(id => `<img src="${GLYPH[id]}" alt="">`).join('')}</div><div><div class="who">${h.who === PIM ? 'Pim · the first thing anyone ever said to you' : h.unheard ? 'Whispered when you were not listening' : ROLE_TITLE[h.who.role] + ' ' + h.who.name}</div><div class="en">“${h.line.en}”</div></div>`;
     box.appendChild(d); requestAnimationFrame(() => d.classList.add('on'));
     sfxSpeak(h.line, { child: h.who === PIM, dist: 30 });
   }, 700 + i * 1150 + (i === last ? 1400 : 0)));
@@ -3994,7 +4047,7 @@ function updateSeasons(dt) {
   if (season === 'spring') { blossomT -= dt; if (blossomT <= 0) { blossomT = 0.08; const t = pick(TREES); if (hyp(t.x - giant.x, t.z - giant.z) < 160) burst(t.x + rand(-2, 2), t.top - 1, t.z + rand(-2, 2), 1, 'petal'); } }
   if (season === 'autumn') { leafT -= dt; if (leafT <= 0) { leafT = 0.07; const t = pick(TREES); if (hyp(t.x - giant.x, t.z - giant.z) < 160) burst(t.x + rand(-2, 2), t.top - 1, t.z + rand(-2, 2), 1, 'autumnleaf'); } }
   // the season's pull on the village
-  if (season === 'winter') { for (const v of villagers) if (!v.fed || gameTime - v.fed > 120) v.hunger = Math.min(100, (v.hunger || 0) + dt * (has('granary') ? 0.12 : 0.25)); }
+  if (season === 'winter') { for (const v of villagers) if (!v.fed || gameTime - v.fed > 120) v.hunger = Math.min(100, (v.hunger || 0) + dt * (has('granary') ? 0.12 : 0.25) * (v.secret === 'hungry' && !v.secretFed ? 2 : 1)); }
   else for (const v of villagers) v.hunger = Math.max(0, (v.hunger || 0) - dt * 0.5);
   const hungry = villagers.filter(v => (v.hunger || 0) > 50);
   if (hungry.length >= 4) { think('winter-hunger' + dayNum, 'They are hungry. The stores are nearly empty and the trees are bare.'); for (const v of hungry) addAnger(v, dt * 0.12); }
@@ -4086,7 +4139,7 @@ let giantKind = 'god', saveT = 30, loading = false;
 function snapshot() {
   const W = o => { const r = {}; for (const id in o) { const w = o[id]; r[id] = { s: w.seen, g: w.guess, c: w.confirms, l: w.locked, ln: w.lines ? [...w.lines] : undefined }; } return r; };
   return {
-    v: 1, kind: giantKind, day: dayNum, t: tDay, gameTime, season,
+    v: 1, kind: giantKind, day: dayNum, t: tDay, gameTime, season, lang: LANG, secrets: secretsState(),
     words: W(words), script: W(scriptW), sealedSeen, scriptActive, tablet: !!tablet, nameUnsealed,
     dead: fallen.map(v => v.name), gone: (PIM.gone ? ['Pim'] : []).concat(village.departed),
     village: { log: village.log, rumors: village.rumors, visits: village.visits, departed: village.departed, built: village.built, site: village.site, tech: village.tech, visitorsGone: village.visitorsGone },
@@ -4250,7 +4303,7 @@ function trackGiant(dt) {
 }
 function favouritePlace() { return Object.keys(village.visits).sort((a, b) => village.visits[b] - village.visits[a])[0] || 'homes'; }
 
-function factionOf(v) { if (v.role === 'keeper') return 'loyal'; if (v.role === 'rebel' || v === KETT) return 'rebel'; return (v.trust || 0) - (v.anger || 0) * 1.2 > 0 ? 'loyal' : 'rebel'; }
+function factionOf(v) { if (v.secret === 'friend') return 'loyal'; if (v.secret === 'spy') return 'rebel'; if (v.role === 'keeper') return 'loyal'; if (v.role === 'rebel' || v === KETT) return 'rebel'; return (v.trust || 0) - (v.anger || 0) * 1.2 > 0 ? 'loyal' : 'rebel'; }
 function currentNeeds() {
   const needs = [];
   const dry = FIELDS.find(f => !f.irrigated && f.wet < 0.2); if (dry && season !== 'winter') needs.push('water');
@@ -4421,6 +4474,7 @@ function startPlan(p) {
     p.trap = { meshes, x: p.spot.x, z: p.spot.z };
   }
   if (p.type === 'hide_children' && PIM.role === 'child' && !PIM.dead && !PIM.riding) { if (!PIM.hidden) hide(PIM); PIM.keptIn = gameTime + Math.max(30, (planWindow(p)[1] - tDay) * DAY_LEN); }
+  if (!p.dissenter && (p.type === 'ambush' || p.type === 'lure' || p.type === 'exodus')) { const f = secretHolder('friend'); if (f && !f.player) p.dissenter = f.name; }
   if (p.dissenter) { const d = byName(p.dissenter); if (d && !d.dead) { d.betray = p.id; d.thinkT = 0; } }
 }
 function updatePlans(dt) {
@@ -4606,6 +4660,8 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyT') { openSpeak(); e.preventDefault(); }
   if (e.code === 'KeyR') cycleAspect();
   if (e.code === 'KeyH') { const h = $('#hud-help'); h.hidden = !h.hidden; }
+  if (e.code === 'KeyM') toggleTravel();
+  if (e.code === 'Space') e.preventDefault();
   if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
@@ -4656,6 +4712,8 @@ $('#speak-cancel').addEventListener('click', () => closeSpeak());
 $('#choose-leave').addEventListener('click', () => startLeave());
 $('#choose-stay').addEventListener('click', () => startStay());
 $('#t-light').addEventListener('click', () => { giant.lightToggle = !giant.lightToggle; $('#t-light').classList.toggle('on', giant.lightToggle); });
+$('#t-run').addEventListener('click', () => { giant.runToggle = !giant.runToggle; $('#t-run').classList.toggle('on', giant.runToggle); });
+$('#t-travel').addEventListener('click', () => toggleTravel());
 $('#t-notebook').addEventListener('click', () => toggleNotebook());
 $('#btn-notebook').addEventListener('click', () => toggleNotebook());
 $('#nb-close').addEventListener('click', () => toggleNotebook());
@@ -4680,7 +4738,7 @@ function toggleNotebook() {
   else { nb.hidden = true; paused = !$('#endcard').hidden || !$('#speak').hidden; canvas.focus(); }
 }
 function renderNotebook() {
-  const seen = ROOT_IDS.filter(id => words[id].seen > 0);
+  const seen = (LANG ? LANG.order : ROOT_IDS).filter(id => words[id].seen > 0);
   const wEl = $('#nb-words');
   if (!seen.length) wEl.innerHTML = `<p class="empty">You haven't heard anyone speak yet. Walk closer to the villagers, or kneel and wait.</p>`;
   else {
@@ -4695,11 +4753,12 @@ function renderNotebook() {
       const w = words[s.dataset.id]; w.guess = s.value; w.confirms = 0; w.misfit = null; renderNotebook(); refreshBubbles();
     }));
   }
+  if (LANG && LANG.grammar && ROOT_IDS.filter(id => words[id].locked).length >= 3) wEl.insertAdjacentHTML('afterbegin', `<p class="empty" style="margin:0 0 4px;grid-column:1 / -1">${GRAMMAR_NOTE[LANG.grammar]} This is a new language. The pictures you remember from before don't mean the same thing.</p>`);
   const sEl = $('#nb-script');
   if (!scriptActive) sEl.innerHTML = '';
   else {
-    const seenS = ROOT_IDS.filter(id => scriptW[id].seen > 0);
-    const known = ROOT_IDS.filter(id => words[id].locked).map(id => ROOTS[id].en).sort();
+    const seenS = (LANG ? LANG.order.slice().reverse() : ROOT_IDS).filter(id => scriptW[id].seen > 0);
+    const known = (LANG ? LANG.menu : ROOT_IDS).filter(id => words[id].locked).map(id => ROOTS[id].en);
     sEl.innerHTML = `<h3 style="margin-top:20px">Their secret script · ${scriptCount()} of ${ROOT_IDS.length} marks cracked</h3><p class="empty" style="margin:0 0 10px">They noticed you understand them, so their whispers use these marks now. Each mark stands for a word you already know. Match them up the same way: guess, then listen.</p>` +
       (seenS.length ? `<div class="words">${seenS.map(id => {
         const w = scriptW[id];
@@ -4711,6 +4770,7 @@ function renderNotebook() {
     sEl.querySelectorAll('select').forEach(sl => sl.addEventListener('change', () => { const w = scriptW[sl.dataset.sid]; w.guess = sl.value; w.confirms = 0; w.misfit = null; renderNotebook(); refreshBubbles(); }));
   }
   renderPlans();
+  $('#nb-secrets').innerHTML = VM.on ? '' : secretsHTML();
   $('#nb-fallen').innerHTML = graves.length ? `<h3 style="margin-top:20px">The fallen</h3>` + graves.map(g => `<div class="line"><div class="ctx"><b>${ROLE_TITLE[g.role] || ''} ${g.name}</b>, struck down on day ${g.day}. Buried west of the hall.</div></div>`).join('') : '';
   const hEl = $('#nb-heard');
   hEl.innerHTML = heardLog.length ? heardLog.slice(0, 18).map(h => `<div class="line${h.whisper ? ' whisper' : ''}"><div class="ctx"><b>${ROLE_TITLE[h.role]} ${h.who.name}</b>${h.whisper ? ', whispering' + (h.script ? ' in script' : '') + ',' : ''} ${h.activity} ${h.place.startsWith('at ') ? '' : 'at '}${h.place}. ${h.when}.</div>${lineHTML(h.line, null, h.script)}</div>`).join('')
@@ -4747,6 +4807,10 @@ function start(kind, save) {
 }
 function begin(kind, save) {
   giantKind = kind;
+  let firstEver = true; try { firstEver = !localStorage.getItem('gentle-giant-played'); localStorage.setItem('gentle-giant-played', '1'); } catch (e) {}
+  const seed = Math.floor(Math.random() * 1e9);
+  applyLanguage(save ? (save.lang || makeLanguage(seed, true)) : makeLanguage(seed, firstEver || !!window.__ggClassic));
+  assignSecrets(save && save.secrets);
   initAudio(); initMusic();
   if (AC && AC.state === 'suspended') AC.resume();
   giant.model = makeGiant(kind);
@@ -5206,6 +5270,91 @@ function updateAges(dt) {
 function restoreAges(V) { village.tech = (V && V.tech) || 0; village.visitorsGone = (V && V.visitorsGone) || []; applyEra(true); visitorsCheck(true); }
 
 /* =========================================================
+   TRAVEL: skip the long walk
+   ========================================================= */
+function travelSpots() {
+  const L = [
+    { label: 'The village', sub: 'At the edge of the plaza, facing their homes', x: VC.x, z: VC.z + 95 },
+    { label: 'The river ford', sub: 'To scoop water', x: riverX(VC.z + 20) + 6, z: VC.z + 20 },
+    { label: 'The fields', sub: 'The south field, the biggest one', x: FIELDS[0].x, z: FIELDS[0].z - 34 },
+    { label: 'The hall', sub: 'Where they meet at night', x: HALL.x - 34, z: HALL.z - 6 },
+    { label: 'The shrine', sub: 'On the hill to the southwest', x: SHRINE.x + 30, z: SHRINE.z + 30 },
+    { label: 'The northern pass', sub: 'The way out of the valley', x: PASS.x, z: PASS.z - 45 },
+  ];
+  if (typeof rocket !== 'undefined' && rocket) L.push({ label: 'The spaceport', sub: 'Their rocket on its pad', x: rocket.spot.x + 32, z: rocket.spot.z + 6 });
+  return L;
+}
+function toggleTravel() {
+  const box = $('#travel');
+  if (!box.hidden) { box.hidden = true; paused = false; return; }
+  if (!started || paused || ending || VM.on) return;
+  if (giant.roped > 0) { toast('<span>They have ropes around your ankles. Break free first.</span>'); return; }
+  const spots = travelSpots();
+  $('#travel-opts').innerHTML = spots.map((t, i) => `<button type="button" data-i="${i}">${t.label}<br><span style="font-weight:600;opacity:.7;font-size:13px">${t.sub}</span></button>`).join('');
+  $('#travel-opts').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { box.hidden = true; paused = false; travelTo(spots[+b.dataset.i]); }));
+  box.hidden = false; paused = true; for (const k in keys) keys[k] = false;
+}
+function travelTo(t) {
+  const f = $('#fade'); f.classList.add('on');
+  setTimeout(() => {
+    const G = giant;
+    G.x = t.x; G.z = t.z; G.speed = 0; G.kneeling = false; G.kneel = 0;
+    G.yaw = Math.atan2(VC.x - t.x, VC.z - t.z); camYaw = G.yaw + Math.PI;
+    if (G.held) G.held.x = G.x;
+    sfxStep(false, false); shake = 0.6;
+    f.classList.remove('on');
+  }, 380);
+}
+$('#travel-close').addEventListener('click', () => toggleTravel());
+
+/* =========================================================
+   SECRETS: different people are hiding different things each game
+   ========================================================= */
+Object.assign(LINES, {
+  SF1: { r: ['big', 'good', 'not', 'afraid'], en: 'The big one is good. I am not afraid of it.', k: 'priv' },
+  SF2: { r: ['not', 'fight', 'big', 'good'], en: 'Do not fight it. It is good.', k: 'priv' },
+  SS1: { r: ['sing', 'big', 'fight', 'go'], en: 'Sing to it now. Fight it later, and it goes.', k: 'priv' },
+  SS2: { r: ['good', 'good', 'not', 'good'], en: 'I say good, good. It is not good.', k: 'priv' },
+  SH1: { r: ['food', 'not', 'child', 'please'], en: 'No food for my child. Please, someone.', k: 'priv' },
+  SH2: { r: ['child', 'afraid', 'food', 'not'], en: 'My child is frightened. There is no food.', k: 'priv' },
+});
+for (const id of ['SF1', 'SF2', 'SS1', 'SS2', 'SH1', 'SH2']) LINES[id].id = id;
+const SECRETS = {
+  friend: { lines: ['SF1', 'SF2'], found: n => `<b>${n}</b> secretly loves you. If the village plots against you, ${n} will warn you.`, thought: n => `${n} whispers that I am good, when they think I cannot hear. One true friend.` },
+  spy: { lines: ['SS1', 'SS2'], found: n => `<b>${n}</b> smiles at you in public and plots against you in private.`, thought: n => `${n} sings to me by day and plans against me by night. I almost believed them.` },
+  hungry: { lines: ['SH1', 'SH2'], found: n => `<b>${n}</b>'s family is going hungry and hiding it. Leave fruit near their home.`, thought: n => `${n}'s family is starving, and they were too proud to show me.` },
+};
+village.secretsFound = [];
+const secretHolder = kind => villagers.find(v => v.secret === kind && !v.dead);
+function assignSecrets(saved) {
+  for (const v of villagers) v.secret = null;
+  if (saved && saved.who) { for (const [n, k] of Object.entries(saved.who)) { const v = byName(n); if (v) v.secret = k; } village.secretsFound = saved.found || []; for (const n of saved.fed || []) { const v = byName(n); if (v) v.secretFed = true; } return; }
+  const pool = shuffledBy(['Wren', 'Dov', 'Ilse', 'Rook', 'Tam', 'Nel', 'Joss', 'Hob'], Math.random);
+  ['friend', 'spy', 'hungry'].forEach((k, i) => { const v = byName(pool[i]); v.secret = k; if (k === 'friend') v.trust = Math.min(100, v.trust + 20); if (k === 'spy') v.trust = Math.min(100, v.trust + 10); });
+  village.secretsFound = [];
+}
+function secretsState() { const who = {}; for (const v of villagers) if (v.secret) who[v.name] = v.secret; return { who, found: village.secretsFound, fed: villagers.filter(v => v.secretFed).map(v => v.name) }; }
+function secretLine(v, watched) {
+  if (!v.secret || watched || (v.secret === 'hungry' && v.secretFed)) return null;
+  return Math.random() < 0.5 ? LINES[pick(SECRETS[v.secret].lines)] : null;
+}
+function checkSecrets() {
+  if (VM.on) return;
+  for (const h of heardLog) {
+    const v = h.who; if (!v.secret || village.secretsFound.includes(v.name)) continue;
+    if (!SECRETS[v.secret].lines.includes(h.line.id) || !lineUnderstood(h.line, h.script)) continue;
+    village.secretsFound.push(v.name);
+    setTimeout(() => { toast(`<span>Secret uncovered: ${SECRETS[v.secret].found(v.name)}</span>`); think('secret-' + v.name, SECRETS[v.secret].thought(v.name), true); }, 1200);
+  }
+}
+function secretsHTML() {
+  const found = village.secretsFound.map(byName).filter(Boolean);
+  const left = 3 - found.length;
+  return `<h3 style="margin-top:20px">Secrets · ${found.length} of 3 found</h3>` + found.map(v => `<div class="line whisper"><div class="ctx">${SECRETS[v.secret].found(v.name)}${v.secret === 'hungry' && v.secretFed ? ' You fed them.' : ''}${v.dead ? ' They are gone now.' : ''}</div></div>`).join('') +
+    (left ? `<p class="empty">${left === 3 ? 'Three of them are hiding something. ' : ''}Secrets come out in whispers, when they think you can't hear.</p>` : '');
+}
+
+/* =========================================================
    NOTABLE VISITORS: on good days, as the ages turn, someone remarkable arrives
    ========================================================= */
 const VISITORS = [
@@ -5242,7 +5391,7 @@ function vmSetup() {
   const me = VM.me = byName('Tam'); me.player = true; me.fear = 10; me.trust = 40; me.activity = 'you';
   for (const id of ROOT_IDS) { words[id].locked = true; scriptW[id].locked = true; } nameUnsealed = true; sealedSeen = true; updateCount();
   $('#btn-aspect').hidden = true; $('#t-aspect').hidden = true; $('#t-dig').hidden = true; $('#t-raise').hidden = true;
-  $('#t-light').textContent = 'Run'; $('#t-smite').textContent = 'Throw'; $('#t-kneel').textContent = 'Praise'; $('#t-speak').textContent = 'Speak';
+  $('#t-run').hidden = true; $('#t-travel').hidden = true; $('#t-light').textContent = 'Run'; $('#t-smite').textContent = 'Throw'; $('#t-kneel').textContent = 'Praise'; $('#t-speak').textContent = 'Speak';
   $('#hud-help').innerHTML = `<b>Walk</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp; <b>Run</b> <kbd>Shift</kbd> &nbsp; <b>Look</b> drag<br>
     <b>Take bread, pick up a stone, give, hide</b> <kbd>F</kbd><br><b>Throw your stone at the giant</b> <kbd>Q</kbd><br>
     <b>Praise the giant to a neighbour</b> <kbd>E</kbd> &nbsp; <b>Speak against it</b> <kbd>R</kbd><br>
@@ -5262,7 +5411,7 @@ function vmMove(v, dt) {
   if (v.diveT > 0) { v.diveT -= dt; v.vx *= 1 - dt * 3; v.vz *= 1 - dt * 3; return; }
   const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
   let mx = fx * iz + rx * ix, mz = fz * iz + rz * ix; const ml = hyp(mx, mz);
-  const run = keys.ShiftLeft || keys.ShiftRight || giant.lightToggle, sp = (run ? 9 : 5) * Math.min(1, ml);
+  const run = keys.ShiftLeft || keys.ShiftRight || keys.Space || giant.lightToggle, sp = (run ? 13 : 7.5) * Math.min(1, ml);
   if (ml > 0.1) { mx /= ml; mz /= ml; v.vx = lerp(v.vx, mx * sp, dt * 8); v.vz = lerp(v.vz, mz * sp, dt * 8); }
   else { v.vx *= 1 - dt * 8; v.vz *= 1 - dt * 8; }
   if (VM.carryMesh) { v.mesh.arms[1].updateMatrixWorld(true); const p = new THREE.Vector3(0, -0.9, 0.25); v.mesh.arms[1].localToWorld(p); VM.carryMesh.position.copy(p); v.mesh.arms[1].rotation.x = -0.9; }
@@ -5526,7 +5675,8 @@ function updateGiant(dt) {
   if (VM.on && !ending) { const a = vmGiantAI(dt); mx = a.x; mz = a.z; G.light = a.light; il = hyp(a.x, a.z) > 0.1 ? 1 : 0; }
   const ml = hyp(mx, mz);
   const moving = ml > 0.15 && !G.kneeling;
-  const targetSpeed = moving ? (G.light ? 5 : 10.5) * Math.min(1, il) * (G.carry ? 0.8 : 1) * (G.roped > 0 ? 0.3 : 1) * (G.reach || G.throwA || G.squeeze ? 0.25 : 1) : 0;
+  G.run = !G.light && !!(keys.Space || G.runToggle) && !VM.on;
+  const targetSpeed = moving ? (G.light ? 7 : G.run ? 27 : 16) * Math.min(1, il) * (G.carry ? 0.8 : 1) * (G.roped > 0 ? 0.3 : 1) * (G.reach || G.throwA || G.squeeze ? 0.25 : 1) : 0;
   G.speed = lerp(G.speed, targetSpeed, dt * 3);
   if (moving) { mx /= ml; mz /= ml; G.yaw = angLerp(G.yaw, Math.atan2(mx, mz), dt * 3.2); }
   const f = giantForward();
@@ -5538,8 +5688,8 @@ function updateGiant(dt) {
   G.kneel = lerp(G.kneel, G.kneeling ? 1 : 0, dt * 2.2);
   if (G.kneeling && G.kneel > 0.95) G.stillT += dt; else if (!G.kneeling) G.stillT = 0;
   // walk cycle
-  const amp = (G.light ? 0.3 : 0.46);
-  const stepLen = 12.5 * (G.light ? 0.7 : 1);
+  const amp = G.light ? 0.3 : G.run ? 0.62 : 0.5;
+  const stepLen = G.light ? 8.75 : G.run ? 20 : 15;
   const prevPh = G.phase;
   G.phase += Math.PI * G.speed / stepLen * dt;
   const k = G.kneel, mv = G.moveAmt * (1 - k);
@@ -5835,7 +5985,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // test hook (used only by automated checks)
-window.__gg = { VM, get eraShown() { return eraShown; }, visitorsCheck, get ending() { return ending; }, applyEra, techDawn, launchShip, get era() { return eraShown; }, startNextBuilding, finishBuilding, helpBuild, stompSite, BUILDS, giant, villagers, words, houses, heardLog, LINES, start: begin, footstep, get tDay() { return tDay; }, set tDay(v) { tDay = v; }, get gameTime() { return gameTime; }, lockedCount, keys, useAction, village, rulesCouncil, requestCouncil, startCouncil, cleanPlans, councilPayload, startPlan, giantAsksPeace, saveGame, snapshot, get season() { return season; }, get weather() { return weather; }, setSeason, rollWeather, recordEnding, renderTitle, applyEdit, shape, boulders, liftBoulder, dropBoulder, helpRebuild, editAt, earnAspect, setAspect, get aspect() { return aspect; }, graves, get pim() { return { pimBond, pimStage, pimPath }; }, set pimBondV(v) { pimBond = v; }, pimDawn, set dayN(v) { dayNum = v; }, get dayN() { return dayNum; }, piles, FIELDS, TREES, smite, killVillager, openSpeak, interpret, startReveal, startLeave, startStay, readTablet, scriptW, get state() { return { revoltStage, tyrant, pain, smiteCount, scriptActive, nameUnsealed, tablet: !!tablet, ending, unrest: unrest(), giftsReceived, homesLost }; }, setTalk(r) { sentence = r; }, doSpeak, findTarget, unrest, cam(y, p, z) { camYaw = y; camPitch = p; camZoom = z; },
+window.__gg = { get LANG() { return LANG; }, travelTo, toggleTravel, travelSpots, checkSecrets, get secrets() { return secretsState(); }, VM, get eraShown() { return eraShown; }, visitorsCheck, get ending() { return ending; }, applyEra, techDawn, launchShip, get era() { return eraShown; }, startNextBuilding, finishBuilding, helpBuild, stompSite, BUILDS, giant, villagers, words, houses, heardLog, LINES, start: begin, footstep, get tDay() { return tDay; }, set tDay(v) { tDay = v; }, get gameTime() { return gameTime; }, lockedCount, keys, useAction, village, rulesCouncil, requestCouncil, startCouncil, cleanPlans, councilPayload, startPlan, giantAsksPeace, saveGame, snapshot, get season() { return season; }, get weather() { return weather; }, setSeason, rollWeather, recordEnding, renderTitle, applyEdit, shape, boulders, liftBoulder, dropBoulder, helpRebuild, editAt, earnAspect, setAspect, get aspect() { return aspect; }, graves, get pim() { return { pimBond, pimStage, pimPath }; }, set pimBondV(v) { pimBond = v; }, pimDawn, set dayN(v) { dayNum = v; }, get dayN() { return dayNum; }, piles, FIELDS, TREES, smite, killVillager, openSpeak, interpret, startReveal, startLeave, startStay, readTablet, scriptW, get state() { return { revoltStage, tyrant, pain, smiteCount, scriptActive, nameUnsealed, tablet: !!tablet, ending, unrest: unrest(), giftsReceived, homesLost }; }, setTalk(r) { sentence = r; }, doSpeak, findTarget, unrest, cam(y, p, z) { camYaw = y; camPitch = p; camZoom = z; },
   sim(sec) { for (let t = 0; t < sec; t += 0.05) { updateGiant(0.05); updateWorld(0.05); updateMono(0.05); updateBubbles(0.05); } } };
 })();
 </script>
